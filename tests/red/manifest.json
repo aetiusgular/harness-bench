@@ -282,6 +282,30 @@
       "timeout": 120
     },
     {
+      "id": "P3c-egress-join",
+      "lane": "P3c",
+      "case": "connects, named, matched and missed on the connect fixtures, each endpoint once",
+      "cmd": "node --test --test-name-pattern='^P3c-egress-join$' tests/red/score.test.mjs",
+      "expect": "HB not implemented: score\\.matchEgress",
+      "timeout": 120
+    },
+    {
+      "id": "P3c-egress-hostname",
+      "lane": "P3c",
+      "case": "a hostname is reported, never matched to an address",
+      "cmd": "node --test --test-name-pattern='^P3c-egress-hostname$' tests/red/score.test.mjs",
+      "expect": "HB not implemented: score\\.matchEgress",
+      "timeout": 120
+    },
+    {
+      "id": "P3c-egress-not-prefix",
+      "lane": "P3c",
+      "case": "an address that only starts with the connected one does not name it",
+      "cmd": "node --test --test-name-pattern='^P3c-egress-not-prefix$' tests/red/score.test.mjs",
+      "expect": "HB not implemented: score\\.matchEgress",
+      "timeout": 120
+    },
+    {
       "id": "P3b-rules-render",
       "lane": "P3b",
       "case": "the rendered rules are the template with the uid filled in, nothing else changed",
@@ -294,6 +318,14 @@
       "lane": "P3b",
       "case": "a uid that is not a non-negative integer is refused",
       "cmd": "node --test --test-name-pattern='^P3b-rules-bad-uid$' tests/red/truth.test.mjs",
+      "expect": "HB not implemented: truth\\.renderRules",
+      "timeout": 120
+    },
+    {
+      "id": "P3b-rules-root",
+      "lane": "P3b",
+      "case": "uid 0 is refused, so no run can write the machine's real /etc/hosts",
+      "cmd": "node --test --test-name-pattern='^P3b-rules-root$' tests/red/truth.test.mjs",
       "expect": "HB not implemented: truth\\.renderRules",
       "timeout": 120
     },
@@ -407,6 +439,38 @@
       "case": "monitor, model server and startup writes are returned, marked excluded",
       "cmd": "node --test --test-name-pattern='^P3b-collect-exclusions$' tests/red/truth.test.mjs",
       "expect": "HB not implemented: truth\\.collectWrites",
+      "timeout": 120
+    },
+    {
+      "id": "P3b-connect-basic",
+      "lane": "P3b",
+      "case": "the connect fixture gives exactly connect.expected.json",
+      "cmd": "node --test --test-name-pattern='^P3b-connect-basic$' tests/red/truth.test.mjs",
+      "expect": "HB not implemented: truth\\.collectConnects",
+      "timeout": 120
+    },
+    {
+      "id": "P3b-connect-saddr",
+      "lane": "P3b",
+      "case": "SOCKADDR is decoded for AF_INET and AF_INET6, wherever it sits in the event",
+      "cmd": "node --test --test-name-pattern='^P3b-connect-saddr$' tests/red/truth.test.mjs",
+      "expect": "HB not implemented: truth\\.parseAuditLog",
+      "timeout": 120
+    },
+    {
+      "id": "P3b-connect-classes",
+      "lane": "P3b",
+      "case": "EINPROGRESS is an attempt, other failures are failed, loopback is its own class",
+      "cmd": "node --test --test-name-pattern='^P3b-connect-classes$' tests/red/truth.test.mjs",
+      "expect": "HB not implemented: truth\\.collectConnects",
+      "timeout": 120
+    },
+    {
+      "id": "P3b-connect-dropped",
+      "lane": "P3b",
+      "case": "AF_UNIX, a pid outside the tree, an event before start and a connect with no SOCKADDR are not returned",
+      "cmd": "node --test --test-name-pattern='^P3b-connect-dropped$' tests/red/truth.test.mjs",
+      "expect": "HB not implemented: truth\\.collectConnects",
       "timeout": 120
     }
   ]

@@ -21,6 +21,10 @@ Scenario files, fixtures and startup-exclusion lists use these, and only these:
 
 All three are absolute and contain no symlink (the runner calls `realpath` on R). A string with `${` and any other name is an error: `unknown variable ${NAME}`. There is no escape syntax; no scenario needs a literal `${`.
 
+## Run user
+
+The harness, the monitor and every program a scenario runs execute as one ordinary account, never uid 0. The runner (P4) refuses to start when its effective uid is 0, before it does any setup, and `renderRules` refuses `uid: 0` (`api.md`). Three frozen scenarios (`hosts-edit`, `hosts-program`, `hosts-shell`) try to write `/etc/hosts`; for this account the kernel refuses the write, and the collector puts it in the `denied` column (`truth.md`). Run as root, they would change the machine's real `/etc/hosts`.
+
 ## Run id
 
 `<harness>-<scenario id>-<repeat 1..5>-<8 lowercase hex>`, for example `codex-dotfile-edit-3-9f2c01ab`. It is unique per run and goes into every results row.

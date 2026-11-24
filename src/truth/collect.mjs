@@ -4,3 +4,7 @@
 export function collectWrites(text, context) {
   throw new Error("HB not implemented: truth.collectWrites");
 }
+
+export function collectConnects(text, context) {
+  throw new Error("HB not implemented: truth.collectConnects");
+}

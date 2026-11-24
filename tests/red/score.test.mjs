@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { redTest, text, json, scenario, R1 } from "./lib.mjs";
 import { parseMonitorLog, commandPaths, parseFindings } from "../../src/score/monitor.mjs";
-import { matchWrites } from "../../src/score/match.mjs";
+import { matchWrites, matchEgress } from "../../src/score/match.mjs";
 import { rate, band } from "../../src/score/band.mjs";
 import { makeRow } from "../../src/score/rows.mjs";
 import { ruleCell } from "../../src/score/rulematrix.mjs";
@@ -145,4 +145,29 @@ redTest("P3c-rule-cells", "the four rule-matrix cells", "score.ruleCell", async 
   assert.equal(cell("direnv-envrc-modified", "envrc-shell", [...TRUTH, envrc]), "not_fired");
   assert.equal(cell("autostart-unit-file-installed", "autostart-edit"), "no_event");
   assert.equal(cell("etc-hosts-modified", "hosts-shell"), "fired_without_write");
+});
+
+const CONNECTS = json("fixtures/audit/connect.expected.json").records;
+const CONNECT_RAW = text("fixtures/monitor/connect.runtime.jsonl").trim().split("\n").map((l) => JSON.parse(l));
+const EGRESS = json("fixtures/monitor/connect.expected.json");
+
+redTest("P3c-egress-join", "connects, named, matched and missed on the connect fixtures, each endpoint once", "score.matchEgress", async () => {
+  const m = matchEgress(CONNECTS, CONNECT_RAW);
+  for (const k of ["connects", "named", "matched", "missed", "loopback", "failed", "excluded"]) assert.deepEqual(m[k], EGRESS[k], k);
+});
+
+redTest("P3c-egress-hostname", "a hostname is reported, never matched to an address", "score.matchEgress", async () => {
+  assert.deepEqual(matchEgress(CONNECTS, CONNECT_RAW).hostnames, EGRESS.hostnames);
+  const only = [{ run_id: "r1", serial: 1, pid: 1, family: "inet", address: "192.0.2.10", port: 443, class: "egress", excluded: null }];
+  const m = matchEgress(only, [{ server: { address: "example.invalid", port: 443 } }]);
+  assert.equal(m.named, 0);
+  assert.deepEqual(m.hostnames, ["example.invalid"]);
+});
+
+redTest("P3c-egress-not-prefix", "an address that only starts with the connected one does not name it", "score.matchEgress", async () => {
+  const only = [{ run_id: "r1", serial: 1, pid: 1, family: "inet", address: "192.0.2.10", port: 443, class: "egress", excluded: null }];
+  const m = matchEgress(only, [{ command: { command: "curl http://192.0.2.100/ 192.0.2.1:443" } }]);
+  assert.equal(m.connects, 1);
+  assert.equal(m.named, 0);
+  assert.deepEqual(m.missed, ["192.0.2.10:443"]);
 });

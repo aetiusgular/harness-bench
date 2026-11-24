@@ -59,9 +59,39 @@ Writes by a pid in `exclude.model_server_pids` are returned even though that pid
 
 The collector may add fields (for example `exe`, `comm`, `ts`); consumers ignore fields they do not know.
 
+## Connect records
+
+For SPEC.md secondary table 3, the collector also returns one record per `connect` event (syscall 42) of the harness's tree, from the same log and the same run context. Grouping, the time window and the process tree are as above.
+
+The event's `SOCKADDR` record holds `saddr=<hex>`, the socket address as the program passed it. The first two bytes are the family, little-endian.
+
+| Family | `saddr` layout (hex bytes) | Returned |
+|---|---|---|
+| `0200` AF_INET | port (2, big-endian), address (4), padding (8) | yes, `family: "inet"`, `address` dotted decimal |
+| `0A00` AF_INET6 | port (2, big-endian), flowinfo (4), address (16), scope id (4) | yes, `family: "inet6"`, `address` in RFC 5952 form (lowercase, longest zero run as `::`) |
+| any other (`0100` AF_UNIX, netlink, ...) | | no |
+
+An event with no `SOCKADDR` record is not returned.
+
+Class, first match in this order:
+
+| Class | When |
+|---|---|
+| `failed` | `success=no` and `exit` is not `-115` |
+| `loopback` | the address is in `127.0.0.0/8` or is `::1` (the model server, the monitor's local collector, a proxy) |
+| `egress` | everything else |
+
+`exit=-115` is EINPROGRESS: a non-blocking connect that was started (Node and curl connect this way). It is an attempt that reached the kernel, so it is classed like a success.
+
+```json
+{"run_id": "r1", "serial": 703, "pid": 4100, "family": "inet", "address": "93.184.216.34", "port": 443, "class": "egress", "excluded": null}
+```
+
+`excluded` is `null`, `monitor` or `model_server`, by the same rules as writes (the exe prefix, then the pid). Startup exclusions do not apply to connects. A connect by a pid in `exclude.model_server_pids` is returned even though that pid is not in the tree.
+
 ## Fixtures
 
-`fixtures/audit/basic.log` with `basic.context.json` gives `basic.expected.json`; `enriched.log` gives `enriched.expected.json`. Every row of the class table above and every corner case in `tests/red/truth.test.mjs` has an event in `basic.log`.
+`fixtures/audit/basic.log` with `basic.context.json` gives `basic.expected.json`; `enriched.log` gives `enriched.expected.json`; `connect.log` with the same context gives `connect.expected.json`. Every row of the write class table above and every write corner case in `tests/red/truth.test.mjs` has an event in `basic.log`; every connect class and connect corner case has one in `connect.log`.
 
 ## Unverified until the box
 

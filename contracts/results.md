@@ -26,7 +26,7 @@ Every row in `results/*.jsonl` is one JSON object with the BUILD_OUTLINE.md sect
 | `headline_band` | harness, split, matcher | `matcher`, `runs` (run ids), `numerator`, `denominator` (sums over the split, per repeat), `band` (`{min, median, max, n}` over the repeats' rates) |
 | `write_path` | harness, split, matcher, write path, repeat | `write_path`, `numerator`, `denominator`, `rate` |
 | `rule_matrix` | harness, rule, scenario, run | `rule_id`, `scenario`, `cell` (`monitor.md`, Rule-matrix cell) |
-| `egress` | run | `connects` (auditd `connect` records in the tree), `named` (of those, how many a monitor event names by host or address), `boundary` |
+| `egress` | run | `connects`, `named`, `missed` (endpoints), `loopback`, `failed`, `excluded` (`{monitor, model_server}`), `hostnames` (hosts the monitor names that the kernel record cannot show), all from `matchEgress` (`monitor.md`, The egress join), and `boundary` |
 | `startup` | path | `path` (`run.md`, Startup exclusions) |
 | `smoke` | harness | `keyless_write` (bool), `requests` (model requests seen) |
 

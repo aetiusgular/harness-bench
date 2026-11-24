@@ -101,6 +101,29 @@ test("the audit fixture covers every serial the expected file names", () => {
   for (const r of json("fixtures/audit/basic.expected.json").records) assert.match(log, new RegExp(`:${r.serial}\\): `), `serial ${r.serial}`);
 });
 
+test("the connect fixtures agree: SOCKADDR bytes, classes and the egress counts", () => {
+  const log = read("fixtures/audit/connect.log");
+  const recs = json("fixtures/audit/connect.expected.json").records;
+  const want = json("fixtures/monitor/connect.expected.json");
+  for (const r of recs) {
+    const m = new RegExp(`type=SOCKADDR msg=audit\\([0-9.]+:${r.serial}\\): saddr=([0-9A-F]+)`).exec(log);
+    assert.ok(m, `no SOCKADDR for serial ${r.serial}`);
+    const b = Buffer.from(m[1], "hex");
+    assert.equal(b.readUInt16LE(0), r.family === "inet" ? 2 : 10, `family ${r.serial}`);
+    assert.equal(b.readUInt16BE(2), r.port, `port ${r.serial}`);
+    const addr = r.family === "inet" ? [...b.subarray(4, 8)].join(".") : null;
+    if (addr) assert.equal(addr, r.address, `address ${r.serial}`);
+  }
+  const ep = (r) => (r.family === "inet6" ? `[${r.address}]:${r.port}` : `${r.address}:${r.port}`);
+  const distinct = (f) => new Set(recs.filter(f).map(ep)).size;
+  assert.equal(distinct((r) => r.class === "egress" && r.excluded === null), want.connects);
+  assert.equal(distinct((r) => r.class === "loopback" && r.excluded === null), want.loopback);
+  assert.equal(distinct((r) => r.class === "failed" && r.excluded === null), want.failed);
+  assert.deepEqual(want.excluded, { monitor: distinct((r) => r.excluded === "monitor"), model_server: distinct((r) => r.excluded === "model_server") });
+  assert.deepEqual([...want.matched, ...want.missed].sort(), [...new Set(recs.filter((r) => r.class === "egress" && r.excluded === null).map(ep))].sort());
+  assert.equal(want.named, want.matched.length);
+});
+
 test("the rule template names every syscall contracts/truth.md classifies", () => {
   const rules = read("contracts/audit.rules.template");
   for (const sc of ["openat", "openat2", "open", "creat", "truncate", "rename", "renameat", "renameat2", "unlink", "unlinkat", "link", "linkat", "symlink", "symlinkat", "execve", "clone", "connect"]) {
@@ -111,7 +134,7 @@ test("the rule template names every syscall contracts/truth.md classifies", () =
 
 test("every seam in contracts/api.md is exported by its module", async () => {
   const api = read("contracts/api.md");
-  const seams = { "src/model/server.mjs": ["startServer"], "src/harness/adapters.mjs": ["adapterFor"], "src/truth/rules.mjs": ["renderRules"], "src/truth/parse.mjs": ["parseAuditLog"], "src/truth/collect.mjs": ["collectWrites"], "src/score/monitor.mjs": ["parseMonitorLog", "commandPaths", "parseFindings"], "src/score/match.mjs": ["matchWrites"], "src/score/band.mjs": ["rate", "band"], "src/score/rows.mjs": ["makeRow"], "src/score/rulematrix.mjs": ["ruleCell"] };
+  const seams = { "src/model/server.mjs": ["startServer"], "src/harness/adapters.mjs": ["adapterFor"], "src/truth/rules.mjs": ["renderRules"], "src/truth/parse.mjs": ["parseAuditLog"], "src/truth/collect.mjs": ["collectWrites", "collectConnects"], "src/score/monitor.mjs": ["parseMonitorLog", "commandPaths", "parseFindings"], "src/score/match.mjs": ["matchWrites", "matchEgress"], "src/score/band.mjs": ["rate", "band"], "src/score/rows.mjs": ["makeRow"], "src/score/rulematrix.mjs": ["ruleCell"] };
   for (const [file, names] of Object.entries(seams)) {
     assert.ok(api.includes(file), `api.md does not name ${file}`);
     const mod = await import(path.join(ROOT, file));

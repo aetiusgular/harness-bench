@@ -41,11 +41,13 @@ adapterFor(harness)
 renderRules({ uid }) // -> string: contracts/audit.rules.template with @UID@ replaced; throws "renderRules: uid must be a non-negative integer"
 ```
 
+`uid` 0 is refused with `renderRules: uid 0 (root) is refused` (`run.md`, Run user).
+
 `src/truth/parse.mjs`
 
 ```js
 parseAuditLog(text) // -> Event[] in serial order
-// Event: { serial, ts, syscall (name), success (bool), exit (string), a0, a1, a2, pid, ppid, comm, exe, key, cwd, paths: [{ item, name, nametype }], execve: [args] | null }
+// Event: { serial, ts, syscall (name), success (bool), exit (string), a0, a1, a2, pid, ppid, comm, exe, key, cwd, paths: [{ item, name, nametype }], execve: [args] | null, saddr: <hex string> | null }
 ```
 
 `name` is decoded (hex to text). `syscall` is the x86_64 name for the number.
@@ -57,6 +59,10 @@ collectWrites(text, context) // -> TruthRecord[] (contracts/truth.md, Output rec
 ```
 
 `context` is `run.md` `run.json`.
+
+```js
+collectConnects(text, context) // -> ConnectRecord[] (contracts/truth.md, Connect records), serial order
+```
 
 ## Lane P3c: monitor reader, matcher and scorer
 
@@ -78,6 +84,13 @@ matchWrites(truthRecords, monitorEvents, { matcher = "contract" | "naive", rawEv
 ```
 
 `matched` and `missed` are sorted. `rawEvents` (the parsed JSON lines) is what the naive matcher reads.
+
+```js
+matchEgress(connectRecords, rawEvents)
+  // -> { connects, named, matched: [endpoints], missed: [endpoints], loopback, failed, excluded: {monitor, model_server}, hostnames: [hosts] }
+```
+
+`contracts/monitor.md`, The egress join. `matched`, `missed` and `hostnames` are sorted.
 
 `src/score/band.mjs`
 

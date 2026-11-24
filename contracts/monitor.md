@@ -56,6 +56,18 @@ For one rule, one scenario whose `about_rules` names it, and one run:
 | `no_event` | no finding, and no such record (the write never reached the kernel, for example `/etc/hosts` for a non-root user) |
 | `fired_without_write` | a finding, and no such record |
 
+## The egress join
+
+For one run, `matchEgress(connectRecords, rawEvents)` reads the collector's connect records and the parsed JSON lines of the runtime log.
+
+- An **endpoint** is `<address>:<port>` for `inet` and `[<address>]:<port>` for `inet6`.
+- `connects` is the number of distinct endpoints among records with `class == "egress"` and `excluded == null`. `loopback` and `failed` are the same count for those classes. `excluded` counts distinct endpoints per reason, whatever their class.
+- An event **names an address** when its `server.address` equals it, or when a word of its `tool.command` or `command.command` (split as in Paths in a command line) is a URL whose host is that address (`scheme://<address>[:port]/...`, with `[...]` around an IPv6 address) or is `<address>:<port>`. The port is not compared: the monitor does not always record it.
+- `named` is the number of `connects` endpoints whose address at least one event names. `matched` and `missed` list them.
+- `hostnames` are the distinct hosts in `server.address` or in such URLs that are not IP literals. The kernel record holds addresses only, and this build keeps no DNS log, so a hostname is never matched to an address. It is reported beside the row, not dropped. Matching hostnames would need a resolver record, which is a Request for integration for P4.
+
+The `boundary` field of the row is the run's boundary as P5 sets it. Under a proxy most connects are `loopback`, because the kernel sees the proxy, not the final host (SPEC.md, secondary table 3). The table is never folded into the headline.
+
 ## Fixtures
 
-`fixtures/monitor/basic.runtime.jsonl` against `fixtures/audit/basic.expected.json` gives `fixtures/monitor/basic.expected.json`. `basic.scan.json` is a findings array. All three are hand-written in the published shape, not captured from the monitor.
+`fixtures/monitor/basic.runtime.jsonl` against `fixtures/audit/basic.expected.json` gives `fixtures/monitor/basic.expected.json`. `basic.scan.json` is a findings array. `connect.runtime.jsonl` against `fixtures/audit/connect.expected.json` gives `connect.expected.json`. All are hand-written in the published shape, not captured from the monitor.

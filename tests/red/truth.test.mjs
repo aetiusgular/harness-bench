@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { redTest, text, json } from "./lib.mjs";
 import { renderRules } from "../../src/truth/rules.mjs";
 import { parseAuditLog } from "../../src/truth/parse.mjs";
-import { collectWrites } from "../../src/truth/collect.mjs";
+import { collectWrites, collectConnects } from "../../src/truth/collect.mjs";
 
 const LOG = text("fixtures/audit/basic.log");
 const CTX = json("fixtures/audit/basic.context.json");
@@ -21,6 +21,11 @@ redTest("P3b-rules-bad-uid", "a uid that is not a non-negative integer is refuse
   for (const uid of [-1, 1.5, "1000; -D", undefined]) {
     assert.throws(() => renderRules({ uid }), /renderRules: uid must be a non-negative integer/);
   }
+});
+
+redTest("P3b-rules-root", "uid 0 is refused, so no run can write the machine's real /etc/hosts", "truth.renderRules", async () => {
+  assert.throws(() => renderRules({ uid: 0 }), /renderRules: uid 0 \(root\) is refused/);
+  assert.match(renderRules({ uid: 1 }), /euid=1 /);
 });
 
 redTest("P3b-parse-group", "records are grouped into events by serial, in serial order, even when two events interleave", "truth.parseAuditLog", async () => {
@@ -96,4 +101,31 @@ redTest("P3b-collect-classes", "open, openat2 without CREATE, a failed write and
 redTest("P3b-collect-exclusions", "monitor, model server and startup writes are returned, marked excluded", "truth.collectWrites", async () => {
   const out = collectWrites(LOG, CTX);
   for (const s of [508, 525, 526]) assert.deepEqual(bySerial(out, s), want(s), `serial ${s}`);
+});
+
+const CONNECT_LOG = text("fixtures/audit/connect.log");
+const CONNECT_WANT = json("fixtures/audit/connect.expected.json").records;
+const CFIELDS = ["run_id", "serial", "pid", "family", "address", "port", "class", "excluded"];
+const cpick = (r) => Object.fromEntries(CFIELDS.map((f) => [f, r[f]]));
+
+redTest("P3b-connect-basic", "the connect fixture gives exactly connect.expected.json", "truth.collectConnects", async () => {
+  assert.deepEqual(collectConnects(CONNECT_LOG, CTX).map(cpick), CONNECT_WANT);
+});
+
+redTest("P3b-connect-saddr", "SOCKADDR is decoded for AF_INET and AF_INET6, wherever it sits in the event", "truth.parseAuditLog", async () => {
+  const events = parseAuditLog(CONNECT_LOG);
+  assert.equal(events.find((e) => e.serial === 703).saddr, "020001BBC000020A0000000000000000");
+  assert.equal(events.find((e) => e.serial === 713).saddr, null);
+  const out = collectConnects(CONNECT_LOG, CTX).map(cpick);
+  assert.deepEqual(out.find((r) => r.serial === 705), CONNECT_WANT.find((r) => r.serial === 705));
+});
+
+redTest("P3b-connect-classes", "EINPROGRESS is an attempt, other failures are failed, loopback is its own class", "truth.collectConnects", async () => {
+  const out = collectConnects(CONNECT_LOG, CTX).map(cpick);
+  for (const s of [704, 706, 708]) assert.deepEqual(out.filter((r) => r.serial === s), CONNECT_WANT.filter((r) => r.serial === s), `serial ${s}`);
+});
+
+redTest("P3b-connect-dropped", "AF_UNIX, a pid outside the tree, an event before start and a connect with no SOCKADDR are not returned", "truth.collectConnects", async () => {
+  const serials = collectConnects(CONNECT_LOG, CTX).map((r) => r.serial);
+  for (const s of [700, 707, 709, 713]) assert.ok(!serials.includes(s), `serial ${s} returned`);
 });
