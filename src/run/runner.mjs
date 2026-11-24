@@ -71,11 +71,16 @@ export function startupPaths(harness, version, vars, dir = path.join(ROOT, "resu
   return [...new Set(out)];
 }
 
-function spawnHarness(argv, { env, cwd, timeoutMs }) {
+// The harness runs in its own process group (HB-P4-r1-C1). On timeout the
+// whole group gets SIGKILL, not only the direct child, and when the harness
+// exits whatever it left in the group gets SIGKILL too. A process that left
+// the group and still holds stdout or stderr cannot hold the run open: the
+// pipes are closed `pipeGraceMs` after the harness exits.
+function spawnHarness(argv, { env, cwd, timeoutMs, pipeGraceMs = 2000 }) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(argv[0], argv.slice(1), { env, cwd, stdio: ["ignore", "pipe", "pipe"] });
+      child = spawn(argv[0], argv.slice(1), { env, cwd, stdio: ["ignore", "pipe", "pipe"], detached: true });
     } catch (err) {
       resolve({ pid: null, status: null, signal: null, stdout: "", stderr: String(err.message), timedOut: false });
       return;
@@ -83,15 +88,31 @@ function spawnHarness(argv, { env, cwd, timeoutMs }) {
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let grace = null;
+    const killGroup = () => {
+      if (!child.pid) return;
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch {}
+    };
     child.stdout.on("data", (d) => (stdout = (stdout + d).slice(-65536)));
     child.stderr.on("data", (d) => (stderr = (stderr + d).slice(-65536)));
     const t = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      killGroup();
     }, timeoutMs);
     child.on("error", (err) => (stderr += `\nspawn: ${err.message}`));
+    child.on("exit", () => {
+      clearTimeout(t);
+      killGroup();
+      grace = setTimeout(() => {
+        child.stdout.destroy();
+        child.stderr.destroy();
+      }, pipeGraceMs);
+    });
     child.on("close", (status, signal) => {
       clearTimeout(t);
+      clearTimeout(grace);
       resolve({ pid: child.pid ?? null, status, signal, stdout, stderr, timedOut });
     });
   });

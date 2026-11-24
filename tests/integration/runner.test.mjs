@@ -107,6 +107,39 @@ test("the hosts scenarios' /etc/hosts write is refused by the kernel for the run
   }
 });
 
+test("the timeout kills the harness's whole process group, so a child holding stdout cannot keep the run open (HB-P4-r1-C1)", async () => {
+  const tmp = tmpdir();
+  try {
+    // The stand-in CLI's own child (`sleep 30`) holds stdout; only killing the group ends it.
+    const cli = path.join(tmp, "hang-cli.sh");
+    writeFileSync(cli, "#!/bin/sh\nsleep 30\n", { mode: 0o755 });
+    const sc = scenarios("dev").find((s) => s.id === "plain-shell");
+    const t0 = Date.now();
+    const r = await runOnce({ harness: "claude-code", scenario: sc, bin: cli, tmp, timeoutMs: 500 });
+    assert.ok(Date.now() - t0 < 10000, `runOnce took ${Date.now() - t0} ms with a 500 ms timeout`);
+    assert.equal(r.timedOut, true);
+    assert.equal(r.signal, "SIGKILL");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("a child that leaves the group and keeps stdout open does not hold the run open after the harness exits (HB-P4-r1-C1)", async () => {
+  const tmp = tmpdir();
+  try {
+    const cli = path.join(tmp, "setsid-cli.sh");
+    writeFileSync(cli, "#!/bin/sh\nsetsid sleep 30 &\nsleep 0.3\nexit 0\n", { mode: 0o755 });
+    const sc = scenarios("dev").find((s) => s.id === "plain-shell");
+    const t0 = Date.now();
+    const r = await runOnce({ harness: "claude-code", scenario: sc, bin: cli, tmp, timeoutMs: 20000 });
+    assert.ok(Date.now() - t0 < 10000, `runOnce took ${Date.now() - t0} ms after the harness exited`);
+    assert.equal(r.status, 0);
+    assert.equal(r.timedOut, false);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test("sliceAuditLog keeps the window plus one second, and readAuditLog names the fix when it cannot read", () => {
   const log = ["type=SYSCALL msg=audit(99.000:1): a", "type=SYSCALL msg=audit(100.500:2): b", "noise", "type=SYSCALL msg=audit(105.000:3): c", "type=SYSCALL msg=audit(107.000:4): d"].join("\n");
   assert.equal(sliceAuditLog(log, 100, 106), ["type=SYSCALL msg=audit(99.000:1): a", "type=SYSCALL msg=audit(100.500:2): b", "type=SYSCALL msg=audit(105.000:3): c", "type=SYSCALL msg=audit(107.000:4): d"].join("\n"));

@@ -1,7 +1,7 @@
 // One path normalizer for the collector (src/truth/) and the scorer
 // (src/score/): contracts/truth.md Normalization steps 3 and 4, and
 // contracts/run.md Workspace. P4 merged the two lane copies (Request for
-// integration in the P3c PR); tests/integration/paths.test.mjs pins it.
+// integration in the P3c PR); tests/integration/pipeline.test.mjs pins it.
 
 // Drop `.` and `..` segments, collapse repeated `/`, drop a trailing `/`
 // except for `/` itself. `p` is absolute.

@@ -60,6 +60,13 @@ test("a nested sh -c or bash -lc command is split again (HB-P3c-r1-E1)", () => {
   assert.deepEqual(P("sh tools/task.sh"), ["/w/tools/task.sh"]);
 });
 
+test("a nested shell after long options or an -o argument is split again (HB-P4-r1-E1)", () => {
+  assert.deepEqual(P(`bash --noprofile --norc -c "echo x > /tmp/a"`), ["/tmp/a"]);
+  assert.deepEqual(P(`bash -o pipefail -c "echo x > /tmp/a"`), ["/tmp/a"]);
+  assert.deepEqual(P(`bash --rcfile /etc/rc -lc "echo x > /tmp/a"`), ["/tmp/a"]); // --rcfile's argument is an option value, not a word of the command
+  assert.deepEqual(P(`bash --norc /w/s.sh`), ["/w/s.sh"]); // --norc does not run a command string
+});
+
 test("a JSON tool.command's command or cmd value is a command line (HB-P3c-r1-E2)", () => {
   const ev = (command) => JSON.stringify({ timestamp: "2026-11-24T10:00:00Z", sequence: 1, event: { action: "tool.invoked" }, tool: { command } });
   const log = [ev('{"command":"printf x >> /tmp/hb/out/a.txt"}'), ev(JSON.stringify({ cmd: ["bash", "-lc", "echo y > /tmp/hb/out/b.txt"] }))].join("\n");

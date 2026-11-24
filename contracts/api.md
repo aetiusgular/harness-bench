@@ -141,7 +141,7 @@ scoreRun({ run, scenario, vars, auditText, monitorText, findingsText, meta })
   // -> { rows, truth, connects }: headline (both matchers), egress and rule_matrix rows via makeRow
 ```
 
-`assertNotRoot` runs first in `prepareRun` and `runOnce`, before anything is created on disk. `monitor` is P5's hook: `{ install({ home, workspace }) -> { exePrefixes, runEnv }, logPath({ home }) }`. The scripted server runs in the runner's process, so `exclude.model_server_pids` is the runner's pid.
+`assertNotRoot` runs first in `prepareRun` and `runOnce`, before anything is created on disk. `monitor` is P5's hook: `{ install({ home, workspace }) -> { exePrefixes, runEnv }, logPath({ home }) }`. The scripted server runs in the runner's process, so `exclude.model_server_pids` is the runner's pid. The harness runs in its own process group: `timeoutMs` ends the whole group with SIGKILL, and so does the harness's own exit, so no process it started outlives the run inside that group (HB-P4-r1-C1).
 
 `src/run/meta.mjs` reads the section 6 fields at run time: `machineLabel()`, `gitSha()`, `splitHash()`, `section6({ runId })`.
 

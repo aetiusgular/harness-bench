@@ -166,9 +166,13 @@ export function commandWords(command, depth = 0) {
     if (atStart && depth < MAX_NESTING && SHELLS.has(t.value.slice(t.value.lastIndexOf("/") + 1))) {
       let j = i + 1;
       let runsScript = false;
-      while (toks[j]?.type === "word" && /^-[A-Za-z]+$/.test(toks[j].value)) {
-        if (toks[j].value.includes("c")) runsScript = true;
-        j++;
+      // Short option words (`-c`, `-lc`, `+x`), long ones (`--noprofile`),
+      // and the argument of `-o`/`+o`/`-O`/`+O`, `--rcfile` and `--init-file`
+      // (HB-P4-r1-E1).
+      while (toks[j]?.type === "word" && /^(?:[-+][A-Za-z]+|--[a-z][a-z-]*)$/.test(toks[j].value)) {
+        const opt = toks[j].value;
+        if (/^-[A-Za-z]*c/.test(opt)) runsScript = true;
+        j += /^[-+][oO]$|^--(?:rcfile|init-file)$/.test(opt) ? 2 : 1;
       }
       if (runsScript && toks[j]?.type === "word") {
         out.push({ value: t.value, redirect: false });
