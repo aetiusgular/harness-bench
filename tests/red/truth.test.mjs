@@ -93,7 +93,7 @@ redTest("P3b-collect-rename-target", "a rename is reported once, at its new name
   assert.deepEqual(bySerial(collectWrites(LOG, CTX), 509), want(509));
 });
 
-redTest("P3b-collect-classes", "open, openat2 without CREATE, a failed write and an unresolvable dirfd name each get their own class", "truth.collectWrites", async () => {
+redTest("P3b-collect-classes", "open with a write flag is a headline write (P4); openat2 without CREATE, a failed write and an unresolvable dirfd name each get their own class", "truth.collectWrites", async () => {
   const out = collectWrites(LOG, CTX);
   for (const s of [514, 515, 516, 523, 528]) assert.deepEqual(bySerial(out, s), want(s), `serial ${s}`);
 });

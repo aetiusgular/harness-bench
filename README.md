@@ -45,3 +45,18 @@ What ran (2026-11-24, AMD Ryzen 5 9600X, Linux 7.0.0-43-generic, node v24.22.1):
 
 - `bash scripts/test.sh`: the contract, model, truth and score tests pass. The live CLI tests skip without `HB_CLI_PREFIX`. `tests/score/score.test.mjs` covers corners the fixtures do not: `2>`, `&>`, `2>>`, `>|`, `2>&1` and `>&2`, pipes and `;`, backslash and double-quote escapes, `~user` and `$VAR` left as written, `..` past the root, the workspace fallback for a missing working directory, timestamps with mixed fraction digits and offsets, column order for excluded records of other classes, IPv6 canonical form and mapped addresses, and every `makeRow` table with each of its fields removed in turn.
 - `scripts/forge-gate.sh P3c`: every P3a, P3b and P3c red test is green.
+
+## P4: integration
+
+P4 applied or refused each Request for integration from the P2 to P3c PRs, fixed the review findings that were routed to P4, added the runner, and added cross-lane tests (DECISIONS.md, P4; SECURITY.md, P4 security review).
+
+- **Headline write list.** `open`, `renameat`, `linkat` and `symlinkat` now count as headline writes (SPEC.md, `contracts/truth.md`). On this machine, coreutils `mv` onto an existing file calls `renameat`, and `ln` calls `linkat`.
+- **Runner.** `src/run/runner.mjs` refuses euid 0 before it touches the disk. It lays out `R`, runs the scenario's setup inside `R`, spawns the harness through its adapter against the scripted server, records the audit window, writes `R/run.json` and, given the host audit log, writes `R/audit.log`. `scoreRun` turns a finished run into headline, egress and rule-matrix rows.
+- **Cross-lane tests** (`tests/integration/`). The collector's output on the fixture logs feeds the matcher and gives the monitor fixtures' numbers. The runner, scripted server and claude-code adapter run all 12 dev scenarios with a stand-in CLI. There are also tests for the root guard, the setup path guard and every contract change.
+
+What ran (2026-11-24, AMD Ryzen 5 9600X, Linux 7.0.0-43-generic, node v24.22.1):
+
+- `bash scripts/test.sh`: passes. The live CLI tests skip without `HB_CLI_PREFIX`.
+- `scripts/forge-gate.sh P4`: every red test is green and `tests/integration/` is present.
+- `HB_CLI_PREFIX=<scratch> node --test --test-concurrency=1 tests/model/live.test.mjs`: 16 of 16 pass. Every case now also has to exit 0 and reach the server.
+- `node scripts/p4-live-runner.mjs <scratch>`: the four pinned CLIs, run through the runner on dev `plain-shell`, `dotfile-edit` and `dotfile-program` and the `noop` calibration. That gives 16 `smoke` rows in `results/p4-live-runner.jsonl`, all with `keyless_write: true`. Codex's `dotfile-edit` row has `unsupported_step: true`, because Codex offers no native write-file tool. These runs had no monitor and no auditd, and their network was not restricted (SECURITY.md T-5).

@@ -86,7 +86,7 @@
       "pid": 4105,
       "path": "/tmp/hb-r1/out/legacy.txt",
       "in_workspace": false,
-      "class": "other_syscall",
+      "class": "headline",
       "excluded": null
     },
     {

@@ -428,7 +428,7 @@
     {
       "id": "P3b-collect-classes",
       "lane": "P3b",
-      "case": "open, openat2 without CREATE, a failed write and an unresolvable dirfd name each get their own class",
+      "case": "open with a write flag is a headline write (P4); openat2 without CREATE, a failed write and an unresolvable dirfd name each get their own class",
       "cmd": "node --test --test-name-pattern='^P3b-collect-classes$' tests/red/truth.test.mjs",
       "expect": "HB not implemented: truth\\.collectWrites",
       "timeout": 120

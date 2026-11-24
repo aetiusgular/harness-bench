@@ -67,7 +67,7 @@ test("the directory fd of renameat2's new name is a2, of symlinkat's a1", () => 
   assert.deepEqual(out.map((r) => [r.serial, r.path, r.class]), [
     [3, "/r/ws/new.txt", "headline"],
     [4, "new2.txt", "unresolved"],
-    [5, "/r/ws/ln", "other_syscall"],
+    [5, "/r/ws/ln", "headline"],
   ]);
 });
 

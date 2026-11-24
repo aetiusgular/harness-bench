@@ -1,6 +1,7 @@
 // Join of ground truth with the monitor's events by path (contracts/monitor.md, The headline join).
 import { rate } from "./band.mjs";
-import { shellTokens } from "./words.mjs";
+import { commandWords } from "./words.mjs";
+import { jsonCommandLines } from "./monitor.mjs";
 import { isIPv4, isIPv6 } from "node:net";
 
 const OTHER = ["other_syscall", "openat2_unclassified", "denied", "unresolved"];
@@ -109,6 +110,36 @@ function wordHost(w) {
   return null;
 }
 
+// The words an event's commands hold, for the egress join. A `tool.command`
+// that parses as a JSON object gives its string values as words (a native
+// fetch tool's `{"url": ...}`), one level into arrays and objects, and its
+// `command` or `cmd` value as a command line (P4, Request for integration in
+// the P3c PR). Anything else is a command line, as is `command.command`.
+function egressWords(o) {
+  const lines = [];
+  const words = [];
+  const tc = o.tool?.command;
+  if (typeof tc === "string" && tc !== "") {
+    let parsed;
+    try {
+      parsed = JSON.parse(tc);
+    } catch {
+      parsed = undefined;
+    }
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      lines.push(...jsonCommandLines(parsed));
+      for (const v of Object.values(parsed)) {
+        for (const x of Array.isArray(v) ? v : v !== null && typeof v === "object" ? Object.values(v) : [v]) {
+          if (typeof x === "string" && x !== "") words.push(x);
+        }
+      }
+    } else lines.push(tc);
+  }
+  if (typeof o.command?.command === "string") lines.push(o.command.command);
+  for (const l of lines) for (const w of commandWords(l)) words.push(w.value);
+  return words;
+}
+
 const endpoint = (r) => (r.family === "inet6" ? `[${r.address}]:${r.port}` : `${r.address}:${r.port}`);
 
 export function matchEgress(connectRecords, rawEvents) {
@@ -133,13 +164,14 @@ export function matchEgress(connectRecords, rawEvents) {
   for (const o of rawEvents ?? []) {
     if (o === null || typeof o !== "object") continue;
     if (typeof o.server?.address === "string" && o.server.address !== "") note(o.server.address, true);
-    for (const cmd of [o.tool?.command, o.command?.command]) {
-      if (typeof cmd !== "string") continue;
-      for (const t of shellTokens(cmd)) {
-        if (t.type !== "word") continue;
-        const h = wordHost(t.value);
-        if (h) note(h.host, h.url);
-      }
+    for (const w of egressWords(o)) {
+      // P4: the value of an `--opt=<value>` word is read too (HB-P3c-r1-C2),
+      // and a word that is an IP literal names that address (HB-P2-r2-E1).
+      const eq = w.startsWith("-") ? w.indexOf("=") : -1;
+      const v = eq >= 0 ? w.slice(eq + 1) : w;
+      const h = wordHost(v);
+      if (h) note(h.host, h.url);
+      else if (isIPv4(v) || isIPv6(v)) note(v, false);
     }
   }
   const matched = new Set();

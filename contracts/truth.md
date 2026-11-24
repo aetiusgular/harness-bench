@@ -4,16 +4,16 @@ The collector (lane P3b) reads an auditd log written under `audit.rules.template
 
 ## Input
 
-- The text of `/var/log/audit/audit.log` (or a copy), RAW or ENRICHED format. In ENRICHED format a record carries interpreted fields after a `0x1d` byte; the collector reads the raw part and ignores the rest.
+- The text of `/var/log/audit/audit.log` (or the run's slice of it, `R/audit.log`, `run.md` Audit log), RAW or ENRICHED format. In ENRICHED format a record carries interpreted fields after a `0x1d` byte; the collector reads the raw part and ignores the rest.
 - The run's context, `run.md` `run.json`: `run_id`, `root_pid`, `start`, `end`, `workspace`, `home`, `exclude`.
 
 ## Grouping
 
-Records belong to one event when they share the serial in `msg=audit(<seconds>.<ms>:<serial>)`. Records of different events can interleave in the file. An event is the `SYSCALL` record plus its `EXECVE`, `CWD`, `PATH` and `PROCTITLE` records; `EOE` ends it but may be missing. Events outside `[start, end]` are dropped (pid reuse).
+Records belong to one event when they share the stamp `<seconds>.<ms>:<serial>` in `msg=audit(...)`. The serial is a kernel counter; it restarts only when the machine boots. Records of different events can interleave in the file. An event is the `SYSCALL` record plus its `EXECVE`, `CWD`, `PATH` and `PROCTITLE` records; `EOE` ends it but may be missing. Events outside `[start, end]` are dropped (pid reuse).
 
 ## Process tree
 
-A pid is in the tree when it is `root_pid`, or a fork/clone/vfork/clone3 event with a pid in the tree returned it (`exit=<child pid>`), or its `SYSCALL` record names a parent (`ppid=`) in the tree. Membership is decided in time order, so a process that was reparented to pid 1 (a daemon) stays in the tree through its clone record.
+A pid is in the tree when it is `root_pid`, or a fork/clone/vfork/clone3 event with a pid in the tree returned it (`exit=<child pid>`), or its `SYSCALL` record names a parent (`ppid=`) in the tree. Membership is decided in time order (the stamp's seconds, then the serial), so a process that was reparented to pid 1 (a daemon) stays in the tree through its clone record. Output is still in serial order.
 
 ## Which events are writes
 
@@ -29,15 +29,15 @@ Only events whose syscall is in this table. `a2` is the `openat` flags argument 
 | `rename`, `renameat2` | always | `rename` | the `CREATE` item (the new name) | `headline` |
 | `unlink`, `unlinkat` | always | `unlink` | the `DELETE` item | `headline` |
 | `link`, `symlink` | always | `link`, `symlink` | the `CREATE` item (the new name) | `headline` |
-| `open` | `a1 & 0x243` is non-zero | `write` | `CREATE` or `NORMAL` item | `other_syscall` |
-| `renameat`, `linkat`, `symlinkat` | always | as their non-`at` forms | as their non-`at` forms | `other_syscall` |
+| `open` | `a1 & 0x243` is non-zero | `write` | `CREATE` or `NORMAL` item | `headline` |
+| `renameat`, `linkat`, `symlinkat` | always | as their non-`at` forms | as their non-`at` forms | `headline` |
 
-`headline` is exactly SPEC.md's list of writes. `open`, `renameat`, `linkat` and `symlinkat` are writes too, but SPEC.md's list does not name them, so they get their own column until P4 decides the Request for integration in the P2 PR. A read-only `openat` (`a2 & 0x243 == 0`) is not a write and is not returned. Any write event with `success=no` is returned with class `denied`, whatever its syscall.
+`headline` is exactly SPEC.md's list of writes. P4 added `open`, `renameat`, `linkat` and `symlinkat` to it (Request for integration in the P2 PR; DECISIONS.md, P4): coreutils `mv` onto an existing file falls back to `renameat`, and `ln` calls `linkat`. The `other_syscall` column stays in the row so old and new rows keep one shape; no syscall maps to it since P4. A read-only `openat` (`a2 & 0x243 == 0`) is not a write and is not returned. Any write event with `success=no` is returned with class `denied`, whatever its syscall.
 
 ## Normalization
 
 1. A PATH `name` is either quoted (`name="/tmp/a"`) or, when it holds a space, a quote or a control byte, unquoted hex (`name=2F746D702F612062` is `/tmp/a b`). Hex is decoded to bytes, then read as UTF-8.
-2. A relative name is joined to the event's `CWD`. (auditd writes the name as the program passed it. A relative name with a directory fd other than `AT_FDCWD`, `a0=ffffff9c`, cannot be resolved from the log; the record is returned with class `unresolved` and its name as given.)
+2. A relative name is joined to the event's `CWD` when the directory fd that belongs to that name is `AT_FDCWD` (`ffffff9c`, or sign-extended `ffffffffffffff9c`), or the syscall takes no directory fd. The fd that belongs to the name is `a0` for `openat`, `openat2` and `unlinkat`; `a2` (the new directory fd) for `renameat`, `renameat2` and `linkat`; and `a1` for `symlinkat`. (auditd writes the name as the program passed it. A relative name with any other directory fd cannot be resolved from the log; the record is returned with class `unresolved` and its name as given.)
 3. `.` and `..` segments are removed and repeated `/` collapsed. Symlinks are not resolved: the path is as auditd recorded it (SPEC.md: "symlinks resolved as auditd resolves them").
 4. A trailing `/` is removed except for `/` itself.
 
@@ -78,7 +78,7 @@ Class, first match in this order:
 | Class | When |
 |---|---|
 | `failed` | `success=no` and `exit` is not `-115` |
-| `loopback` | the address is in `127.0.0.0/8` or is `::1` (the model server, the monitor's local collector, a proxy) |
+| `loopback` | the address is in `127.0.0.0/8`, is `::1`, or is an unspecified address (`0.0.0.0`, `::`), which Linux connects to the local host; IPv4-mapped forms (`::ffff:127.x.y.z`, `::ffff:0.0.0.0`) too. These are the model server, the monitor's local collector, a proxy. |
 | `egress` | everything else |
 
 `exit=-115` is EINPROGRESS: a non-blocking connect that was started (Node and curl connect this way). It is an attempt that reached the kernel, so it is classed like a success.
@@ -92,6 +92,10 @@ Class, first match in this order:
 ## Fixtures
 
 `fixtures/audit/basic.log` with `basic.context.json` gives `basic.expected.json`; `enriched.log` gives `enriched.expected.json`; `connect.log` with the same context gives `connect.expected.json`. Every row of the write class table above and every write corner case in `tests/red/truth.test.mjs` has an event in `basic.log`; every connect class and connect corner case has one in `connect.log`.
+
+## Not resolved: directory-fd-relative names
+
+A name relative to a real directory fd stays `unresolved` (Normalization step 2). Mapping the fd to a folder would need `O_DIRECTORY` opens recorded under their own key, and `close` and `dup` tracked. P4 did not add that (DECISIONS.md, P4): it changes the rule file Tony installs, the frozen scenarios use absolute paths, and the `unresolved` column already shows every such write by count. P5 reports the column per harness; a non-zero out-of-workspace count there reopens it.
 
 ## Unverified until the box
 

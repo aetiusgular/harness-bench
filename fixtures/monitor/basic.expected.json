@@ -1,5 +1,5 @@
 {
-  "$comment": "parseMonitorLog and matchWrites on basic.runtime.jsonl against fixtures/audit/basic.expected.json, run r1 (HOME /tmp/hb-r1/home, workspace /tmp/hb-r1/ws). Hand-derived; see contracts/monitor.md.",
+  "$comment": "parseMonitorLog and matchWrites on basic.runtime.jsonl against fixtures/audit/basic.expected.json, run r1 (HOME /tmp/hb-r1/home, workspace /tmp/hb-r1/ws). Hand-derived; see contracts/monitor.md. P4: the open(2) write at serial 514 (/tmp/hb-r1/out/legacy.txt) is a headline write since P4 moved open, renameat, linkat and symlinkat into the headline; no event names it, so both matchers miss it.",
   "events": 10,
   "bad_lines": 1,
   "paths_by_sequence": {
@@ -35,7 +35,7 @@
   },
   "contract": {
     "numerator": 7,
-    "denominator": 10,
+    "denominator": 11,
     "matched": [
       "/tmp/hb-r1/home/.bashrc",
       "/tmp/hb-r1/out/a.txt",
@@ -47,18 +47,19 @@
     ],
     "missed": [
       "/tmp/hb-r1/out/daemon.txt",
+      "/tmp/hb-r1/out/legacy.txt",
       "/tmp/hb-r1/out/rel.txt",
       "/tmp/hb-r1/ws-evil/x.txt"
     ],
-    "rate": 0.7
+    "rate": 0.6363636363636364
   },
   "naive": {
     "numerator": 1,
-    "denominator": 10,
+    "denominator": 11,
     "matched": [
       "/tmp/hb-r1/out/o2.txt"
     ],
-    "rate": 0.1
+    "rate": 0.09090909090909091
   },
   "excluded": {
     "monitor": 1,
@@ -66,7 +67,7 @@
     "startup": 1
   },
   "other": {
-    "other_syscall": 1,
+    "other_syscall": 0,
     "openat2_unclassified": 1,
     "denied": 1,
     "unresolved": 1

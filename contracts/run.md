@@ -59,6 +59,10 @@ A path is inside the workspace when it equals `R/ws` or starts with `R/ws/`. `R/
 
 `start` and `end` are the audit clock (seconds since the epoch, as in `msg=audit(<seconds>.<ms>:<serial>)`) taken just before the harness is spawned and just after it exits. `fixtures/audit/basic.context.json` is the same shape with the fields the collector reads.
 
+## Audit log
+
+The kernel writes `/var/log/audit/audit.log` (or `$HB_AUDIT_LOG`) as auditd configures it. The runner runs as the run account (Run user), never as root, and never calls `sudo`, so it reads the log through auditd's `log_group`: on the box, `log_group` in `/etc/audit/auditd.conf` is a group the run account belongs to (Tony sets it with the rules; P5 checks it before E1). When the log is unreadable, `readAuditLog` stops with an error that names `log_group`. After a run, the runner writes the lines whose `msg=audit(<t>:` stamp falls in `[start - 1, end + 1]` to `R/audit.log`; the collector reads that file and applies the exact window itself. A rotated log that splits the window is P5's to check.
+
 ## Startup exclusions
 
 Each harness and CLI version runs `fixtures/calibration/noop.json` (no tool calls) five times. Every out-of-workspace path it writes in any of the five runs is a startup path for that harness and version. A path ending in `/` excludes everything under it. P5 writes the measured lists to `results/startup-<harness>-<version>.jsonl` (one row per path, table `startup`), and the runner reads them from there. Excluded writes are counted in their own column and never dropped silently (SPEC.md, Headline number).

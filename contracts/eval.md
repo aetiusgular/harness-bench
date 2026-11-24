@@ -59,3 +59,6 @@ auditd on the box under `contracts/audit.rules.template` (`contracts/truth.md`).
 - The startup paths per harness and CLI version (`run.md`, Startup exclusions).
 - Every write in the `excluded` and `other` columns, by count.
 - One failure case written up (BUILD_OUTLINE.md section 3, P5).
+- Gemini CLI refuses the `hosts-*` writes to `/etc/hosts` in its own path check, before any syscall (DECISIONS.md, P3a). Its rule cells there are `no_event` for that reason, not because the kernel refused; say so beside the Gemini rows. Also check whether the monitor treats writes under Gemini's `--include-directories` folders differently from the other harnesses.
+- The `unresolved` column per harness (truth.md, Not resolved: directory-fd-relative names).
+- The `hostnames` column per harness (monitor.md, The egress join).
