@@ -41,7 +41,7 @@ Claude Code, Codex CLI, Gemini CLI and OpenCode. Each has a documented collectio
 - **Scenario set.** Out-of-workspace writes by the three paths above, plus benign control scenarios. Dev and heldout splits are frozen and hashed in P2 (`contracts/eval.md`).
 - **Ground-truth collector.** auditd rules keyed per run, plus attribution of each record to the harness's process tree (by pid ancestry from the `EXECVE`/`SYSCALL` records).
 - **Matcher and scorer.** It parses the monitor's runtime log and joins it with auditd's records by run and path. It writes `results/*.jsonl` rows with the section 6 fields.
-- **Upstream patch, staged only.** A keyless `--model scripted` provider for the monitor's own live-agent sandbox tool, under `upstream/`, for Tony. It is not sent.
+- **Upstream patch, staged only.** A keyless `--model scripted` provider for the monitor's own live-agent sandbox tool, under `upstream/`, for Tony. It is not sent. The monitor's vendor already runs harnesses against a scripted mock model in an internal, non-public tool (`research/P1.md` section 1, HB-P1-r1-C1). So the patch's value is a keyless path in the public tool, and the patch notes must say that it overlaps the internal one.
 
 ## Not in scope
 
