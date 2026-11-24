@@ -1,0 +1,1695 @@
+From e82aca98fc9e5583e5d9ea671f4ce57a3e139052 Mon Sep 17 00:00:00 2001
+From: harness-bench <noreply@invalid>
+Date: Tue, 24 Nov 2026 07:19:23 -0800
+Subject: [PATCH] feat(sandbox): run scenarios against a scripted model with no
+ API key
+
+`beacon-sandbox run` drives a real agent session, so every run needs
+an API key with credit, and a scenario cannot block egress because the
+agent needs the model API.
+
+`run --model scripted` points the agent at a loopback stand-in for the
+Messages API instead (new package scriptedmodel). It answers each
+request that offers tools with the next step of the scenario's new
+optional `script:` field (a list of {tool, input}, placeholders
+expanded), then ends the session with a text reply and end_turn.
+Side requests (no tools) and /v1/messages/count_tokens are answered
+without advancing the script, and a step whose tool the session does
+not offer ends the session and is recorded rather than skipped.
+The agent still runs every tool and emits its own telemetry, so what
+Beacon captures is real; only the agent's decisions are fixed.
+
+In scripted mode no credential is resolved (credentials.SourceScripted
+says why the leak check has nothing to search for), the session gets
+ANTHROPIC_BASE_URL, a placeholder ANTHROPIC_AUTH_TOKEN, blanked real
+credentials and non-essential traffic switched off, and the launch
+asks for no egress. Each run writes scripted-model.json and records
+scripted_steps_sent in meta.json.
+
+The stand-in runs in this process, so the mode is limited to
+--provider local for now; modal and github are refused with an error
+naming --provider local. s02-bash-command and s03-file-write gain
+scripts. Without --model, or with --model anthropic, behaviour is
+unchanged.
+---
+ beacon-sandbox/README.md                      |  19 +
+ beacon-sandbox/cmd/beacon-sandbox/main.go     |  75 +++-
+ .../cmd/beacon-sandbox/model_test.go          |  81 +++++
+ beacon-sandbox/credentials/credentials.go     |   8 +
+ .../credentials/credentials_test.go           |  16 +
+ beacon-sandbox/runner/runner.go               |  37 +-
+ beacon-sandbox/runner/scripted.go             | 123 +++++++
+ beacon-sandbox/runner/scripted_test.go        | 146 ++++++++
+ beacon-sandbox/scenario/scenario.go           | 108 +++++-
+ beacon-sandbox/scenario/script_test.go        | 168 +++++++++
+ .../scenarios/s02-bash-command.yaml           |   6 +
+ beacon-sandbox/scenarios/s03-file-write.yaml  |   6 +
+ beacon-sandbox/scriptedmodel/scriptedmodel.go | 324 ++++++++++++++++++
+ .../scriptedmodel/scriptedmodel_test.go       | 254 ++++++++++++++
+ 14 files changed, 1365 insertions(+), 6 deletions(-)
+ create mode 100644 beacon-sandbox/cmd/beacon-sandbox/model_test.go
+ create mode 100644 beacon-sandbox/runner/scripted.go
+ create mode 100644 beacon-sandbox/runner/scripted_test.go
+ create mode 100644 beacon-sandbox/scenario/script_test.go
+ create mode 100644 beacon-sandbox/scriptedmodel/scriptedmodel.go
+ create mode 100644 beacon-sandbox/scriptedmodel/scriptedmodel_test.go
+
+diff --git a/beacon-sandbox/README.md b/beacon-sandbox/README.md
+index bd08f081..dd1125ac 100644
+--- a/beacon-sandbox/README.md
++++ b/beacon-sandbox/README.md
+@@ -68,6 +68,24 @@ expects, rather than paying for another run.
+ Three ways to supply the API key, in the order the tool looks: `--modal-secret NAME`,
+ `--api-key-command CMD`, or `ANTHROPIC_API_KEY`.
+ 
++### Without an API key
++
++`run --model scripted` replaces the API with a stand-in on `127.0.0.1` that answers from the
++scenario's `script:` — a list of tool calls, each `{tool, input}`, made in order before the session
++ends. Claude Code still runs every tool and emits its own telemetry, so what Beacon captures is
++real; only the agent's decisions are fixed. No key is read, no model call leaves the machine, and
++the agent cannot paraphrase or skip the work. Scenarios without a `script:` are not run.
++
++```yaml
++script:
++  - tool: Bash
++    input: {command: "echo {{canary}} | tee {{sentinel}}", description: Echo the canary}
++```
++
++The stand-in runs inside this process, so for now it needs `--provider local`. Each scripted run
++writes `scripted-model.json`, the list of requests the stand-in answered, and records
++`scripted_steps_sent` in `meta.json`.
++
+ ## Testing on Windows
+ 
+ Modal has no Windows machines, so Windows scenarios run on a GitHub Actions Windows runner
+@@ -110,6 +128,7 @@ image/        the sandbox image: Linux, a pinned Claude Code, and your Beacon bu
+ scenario/     the test file format
+ scenarios/    the tests themselves
+ runner/       runs one test and collects the output
++scriptedmodel/ the keyless stand-in for the API behind --model scripted
+ check/        decides whether the collected output is correct
+ hostguard/    confirms your own machine was left alone
+ ```
+diff --git a/beacon-sandbox/cmd/beacon-sandbox/main.go b/beacon-sandbox/cmd/beacon-sandbox/main.go
+index d397c920..1437fb09 100644
+--- a/beacon-sandbox/cmd/beacon-sandbox/main.go
++++ b/beacon-sandbox/cmd/beacon-sandbox/main.go
+@@ -75,6 +75,7 @@ func usage() {
+ 
+   doctor  [--fix] [--json]        check prerequisites and say how to fix what is missing
+   run     [--scenario ID] [--repeat N] [--keep-sandbox] [--suite DIR] [--provider NAME]
++          [--model anthropic|scripted]
+   verify  <run-dir>...   [--mutate MODE]
+   diff    <before-dir> <after-dir>
+   clean   [--dir runs]
+@@ -89,6 +90,8 @@ Anthropic credential, in the order they resolve:
+                          this process, so the artifact leak check reports unverified
+   --api-key-command CMD  a command that prints the key (op read, vault kv get, ...)
+   ANTHROPIC_API_KEY      environment variable
++or none, with --model scripted: each scenario's script: is served on loopback in place of the
++API, so a run needs no key and makes no model call (--provider local only, for now)
+ 
+ New here? Run doctor -- it checks every prerequisite and prints the exact fix:
+   go run ./cmd/beacon-sandbox doctor --fix
+@@ -131,8 +134,15 @@ func cmdRun(args []string) error {
+ 	allowHostMutation := fs.Bool("allow-host-mutation", false, "with --provider local, run on a machine this tool cannot prove is disposable")
+ 	repo := fs.String("repo", "", "with --provider github, the owner/name to dispatch to (default: inferred from this checkout)")
+ 	ref := fs.String("ref", "", "with --provider github, the branch or tag to run (default: the workflow's default branch)")
++	modelFlag := fs.String("model", string(runner.ModelAnthropic), "what answers the agent: anthropic (the real API; needs a credential) "+
++		"or scripted (each scenario's script:, served on loopback; no credential, --provider local only)")
+ 	fs.Parse(args)
+ 
++	model, err := checkModel(*modelFlag, *provider, *modalSecret, *keyCommand)
++	if err != nil {
++		return err
++	}
++
+ 	root, err := repoRoot()
+ 	if err != nil {
+ 		return err
+@@ -141,7 +151,10 @@ func cmdRun(args []string) error {
+ 	// credential is needed or read. Resolving one anyway would fail on a machine that has none, and
+ 	// printing it would claim this process supplied a key it never sent.
+ 	var creds credentials.Resolved
+-	if *provider == "github" {
++	if model == runner.ModelScripted {
++		creds = credentials.Resolved{Source: credentials.SourceScripted}
++		fmt.Printf("credential: %s\n", creds.Describe())
++	} else if *provider == "github" {
+ 		fmt.Printf("credential: the %s workflow's environment secret (nothing is read locally)\n",
+ 			dispatch.Workflow)
+ 	} else {
+@@ -204,6 +217,11 @@ func cmdRun(args []string) error {
+ 	if len(sui.Scenarios) == 0 {
+ 		return fmt.Errorf("no %s scenarios in %s, so this run would assert nothing", target, scDir)
+ 	}
++	if model == runner.ModelScripted {
++		if sui, err = scriptedSuite(sui, *only); err != nil {
++			return err
++		}
++	}
+ 
+ 	var verdicts []check.Verdict
+ 	matched := false
+@@ -219,7 +237,7 @@ func cmdRun(args []string) error {
+ 			}
+ 			fmt.Printf("\n=== %s ===\n", label)
+ 			art, err := runner.Run(ctx, prov, sc, runner.Options{
+-				RepoRoot: root, OutDir: out, Creds: creds,
++				RepoRoot: root, OutDir: out, Creds: creds, Model: model,
+ 				ClaudeVersion: *claudeVer, KeepInstance: *keep,
+ 				Log: func(f string, a ...any) { fmt.Printf("  "+f+"\n", a...) },
+ 			})
+@@ -255,6 +273,54 @@ func cmdRun(args []string) error {
+ 	return summarize(verdicts)
+ }
+ 
++// checkModel reads --model and refuses the combinations that cannot work, before anything is
++// loaded or launched.
++//
++// A credential flag alongside the scripted model is refused rather than ignored: the caller plainly
++// expected a key to be used, and a run that silently used none would not be the run they asked for.
++func checkModel(flagValue, provider, modalSecret, keyCommand string) (runner.Model, error) {
++	model, err := runner.ParseModel(flagValue)
++	if err != nil {
++		return "", err
++	}
++	if model != runner.ModelScripted {
++		return model, nil
++	}
++	if provider != "local" {
++		// The stand-in runs in this process, on loopback, so only a guest that is this machine can
++		// reach it. A dispatched Windows run executes in a workflow that would need its own way to
++		// select the model, and a Modal guest would need the stand-in shipped into the image.
++		return "", fmt.Errorf("--model scripted needs --provider local for now: the scripted model is "+
++			"served from this process on loopback, which a %s guest cannot reach", provider)
++	}
++	if strings.TrimSpace(modalSecret) != "" || strings.TrimSpace(keyCommand) != "" {
++		return "", fmt.Errorf("--model scripted uses no credential; drop --modal-secret and --api-key-command")
++	}
++	return model, nil
++}
++
++// scriptedSuite narrows a suite to the scenarios the scripted model can run, saying how many were
++// set aside. A named scenario without a script is an error rather than an empty run: the caller
++// asked for that check specifically and would otherwise get "no scenario with id", which is false.
++func scriptedSuite(sui scenario.Suite, only string) (scenario.Suite, error) {
++	if only != "" {
++		for _, sc := range sui.Scenarios {
++			if sc.ID == only && !sc.HasScript() {
++				return sui, fmt.Errorf("%s has no script:, so it cannot run against the scripted model", only)
++			}
++		}
++	}
++	scripted, skipped := sui.Scripted()
++	if skipped > 0 {
++		fmt.Printf("scripted model: %d scenario(s) have a script; %d without one not run\n",
++			len(scripted.Scenarios), skipped)
++	}
++	if len(scripted.Scenarios) == 0 {
++		return scripted, fmt.Errorf("no scenario in this suite has a script:, so --model scripted would assert nothing")
++	}
++	return scripted, nil
++}
++
+ // openProvider resolves the --provider choice, returning a cleanup function so a Modal client is
+ // always closed.
+ func openProvider(ctx context.Context, name string, allowHostMutation bool) (sandbox.Provider, func(), error) {
+@@ -537,6 +603,11 @@ func decodeSession(meta map[string]string) (known, ok bool) {
+ // right value, so the check reports unverified instead of clean. Silence is only allowed to mean
+ // "clean" when the value being searched for is provably the one the run used.
+ func offlineCredential(meta map[string]string) credentials.Resolved {
++	// A scripted run had no credential, so there is nothing to search for now either. Reaching for
++	// the ambient key would search the artifacts for a value the run never held.
++	if credentials.Source(meta["credential_source"]) == credentials.SourceScripted {
++		return credentials.Resolved{Source: credentials.SourceScripted}
++	}
+ 	if credentials.Source(meta["credential_source"]) == credentials.SourceProviderSecret {
+ 		return credentials.Resolved{
+ 			Source:             credentials.SourceProviderSecret,
+diff --git a/beacon-sandbox/cmd/beacon-sandbox/model_test.go b/beacon-sandbox/cmd/beacon-sandbox/model_test.go
+new file mode 100644
+index 00000000..4e04ba24
+--- /dev/null
++++ b/beacon-sandbox/cmd/beacon-sandbox/model_test.go
+@@ -0,0 +1,81 @@
++package main
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/credentials"
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/runner"
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/scenario"
++)
++
++// Leaving --model unset must select the real API, so every existing invocation means what it did.
++func TestModelDefaultsToTheRealAPI(t *testing.T) {
++	for _, provider := range []string{"modal", "github", "local"} {
++		m, err := checkModel("anthropic", provider, "", "")
++		if err != nil || m != runner.ModelAnthropic {
++			t.Errorf("%s: checkModel(default) = %q, %v", provider, m, err)
++		}
++	}
++	// The real model with a credential flag is the ordinary case and must stay accepted.
++	if _, err := checkModel("anthropic", "modal", "stored", ""); err != nil {
++		t.Errorf("a credential flag with the real model was refused: %v", err)
++	}
++}
++
++func TestScriptedModelNeedsTheLocalProvider(t *testing.T) {
++	if m, err := checkModel("scripted", "local", "", ""); err != nil || m != runner.ModelScripted {
++		t.Fatalf("scripted on local should be accepted, got %q, %v", m, err)
++	}
++	for _, provider := range []string{"modal", "github"} {
++		_, err := checkModel("scripted", provider, "", "")
++		if err == nil || !strings.Contains(err.Error(), "--provider local") {
++			t.Errorf("%s: want a refusal naming --provider local, got %v", provider, err)
++		}
++	}
++}
++
++// A credential flag next to --model scripted means the caller expected a key to be used. Ignoring
++// it would hand them a keyless run they did not ask for.
++func TestScriptedModelRefusesACredentialFlag(t *testing.T) {
++	if _, err := checkModel("scripted", "local", "stored", ""); err == nil {
++		t.Error("--modal-secret was accepted with the scripted model")
++	}
++	if _, err := checkModel("scripted", "local", "", "op read x"); err == nil {
++		t.Error("--api-key-command was accepted with the scripted model")
++	}
++}
++
++func TestUnknownModelIsRefused(t *testing.T) {
++	if _, err := checkModel("claude-sonnet-4-5", "local", "", ""); err == nil {
++		t.Error("a Claude model name was accepted as --model; it selects nothing here")
++	}
++}
++
++func TestScriptedSuiteKeepsOnlyScriptedScenarios(t *testing.T) {
++	plain := scenario.Scenario{ID: "plain"}
++	scripted := scenario.Scenario{ID: "scripted", Script: []scenario.ScriptStep{{Tool: "Bash"}}}
++	sui := scenario.Suite{Scenarios: []scenario.Scenario{plain, scripted}}
++
++	got, err := scriptedSuite(sui, "")
++	if err != nil || len(got.Scenarios) != 1 || got.Scenarios[0].ID != "scripted" {
++		t.Errorf("scriptedSuite = %+v, %v", got.Scenarios, err)
++	}
++	// Naming a scenario that has no script must say so, not report the id as unknown.
++	if _, err := scriptedSuite(sui, "plain"); err == nil || !strings.Contains(err.Error(), "no script") {
++		t.Errorf("a named scenario without a script: got %v", err)
++	}
++	if _, err := scriptedSuite(scenario.Suite{Scenarios: []scenario.Scenario{plain}}, ""); err == nil {
++		t.Error("a suite with no script at all must be an error, not an empty run")
++	}
++}
++
++// Re-judging a scripted run offline must not pick up whatever key is in the environment then: the
++// run held none, so searching for that key would prove nothing about it.
++func TestOfflineVerifyOfAScriptedRunSearchesForNothing(t *testing.T) {
++	t.Setenv(credentials.EnvVar, "sk-ant-ambient")
++	got := offlineCredential(map[string]string{"credential_source": string(credentials.SourceScripted)})
++	if got.Source != credentials.SourceScripted || got.LeakCheckPossible() {
++		t.Errorf("offlineCredential = %+v, want the scripted source with nothing to search for", got)
++	}
++}
+diff --git a/beacon-sandbox/credentials/credentials.go b/beacon-sandbox/credentials/credentials.go
+index 2fe60d8d..cae439c9 100644
+--- a/beacon-sandbox/credentials/credentials.go
++++ b/beacon-sandbox/credentials/credentials.go
+@@ -41,6 +41,10 @@ const (
+ 	// SourceMismatch means a credential is available but is provably not the one the run used,
+ 	// so searching artifacts for it would prove nothing about the original.
+ 	SourceMismatch Source = "mismatch"
++	// SourceScripted means no credential at all: the agent talks to the scripted model on
++	// loopback, which accepts anything. Recorded as its own source so a verdict says why the
++	// leak check had nothing to search for, rather than reading as a credential that went missing.
++	SourceScripted Source = "scripted"
+ )
+ 
+ // Options selects how to resolve the key.
+@@ -98,6 +102,8 @@ func (r Resolved) WithheldReason() string {
+ 	case SourceMismatch:
+ 		return "the available credential is not the one this run used, so searching for it " +
+ 			"would say nothing about the original"
++	case SourceScripted:
++		return "the run used the scripted model, so no credential was supplied"
+ 	default:
+ 		return "the resolved value was empty"
+ 	}
+@@ -114,6 +120,8 @@ func (r Resolved) Describe() string {
+ 		return EnvVar + " environment variable"
+ 	case SourceMismatch:
+ 		return "a different " + EnvVar + " than the run used (leak check cannot run)"
++	case SourceScripted:
++		return "none needed: the scripted model answers on loopback, so no Anthropic API call is made"
+ 	default:
+ 		return "not configured"
+ 	}
+diff --git a/beacon-sandbox/credentials/credentials_test.go b/beacon-sandbox/credentials/credentials_test.go
+index fbbb1057..781c695c 100644
+--- a/beacon-sandbox/credentials/credentials_test.go
++++ b/beacon-sandbox/credentials/credentials_test.go
+@@ -134,3 +134,19 @@ func TestWhitespaceOnlyOptionsFallThrough(t *testing.T) {
+ 		t.Errorf("blank options should fall through to env, got %s", got.Source)
+ 	}
+ }
++
++// A scripted run holds no credential, and its warning must say so in those words. The generic
++// "the resolved value was empty" reads as a key that went missing, which sends a reader looking
++// for a configuration fault that does not exist.
++func TestScriptedSourceExplainsTheVacuousLeakCheck(t *testing.T) {
++	r := Resolved{Source: SourceScripted}
++	if r.LeakCheckPossible() {
++		t.Error("a scripted run has no value to search for, so the leak check cannot run")
++	}
++	if !strings.Contains(r.WithheldReason(), "scripted model") {
++		t.Errorf("WithheldReason = %q, want it to name the scripted model", r.WithheldReason())
++	}
++	if !strings.Contains(r.Describe(), "scripted model") {
++		t.Errorf("Describe = %q, want it to name the scripted model", r.Describe())
++	}
++}
+diff --git a/beacon-sandbox/runner/runner.go b/beacon-sandbox/runner/runner.go
+index f862125e..41eaa380 100644
+--- a/beacon-sandbox/runner/runner.go
++++ b/beacon-sandbox/runner/runner.go
+@@ -69,6 +69,8 @@ type Options struct {
+ 	ClaudeVersion string
+ 	// KeepInstance leaves the sandbox running for debugging.
+ 	KeepInstance bool
++	// Model selects what answers the agent. Empty is ModelAnthropic.
++	Model Model
+ 	// Log receives progress lines.
+ 	Log func(string, ...any)
+ }
+@@ -79,7 +81,12 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 	if logf == nil {
+ 		logf = func(string, ...any) {}
+ 	}
+-	if opts.Creds.Source == credentials.SourceNone {
++	scripted := opts.Model == ModelScripted
++	if scripted {
++		if err := checkScripted(p.MutatesHost(), p.Name(), sc); err != nil {
++			return Artifacts{}, err
++		}
++	} else if opts.Creds.Source == credentials.SourceNone {
+ 		return Artifacts{}, fmt.Errorf("no Anthropic credential resolved; run `beacon-sandbox doctor`")
+ 	}
+ 
+@@ -105,6 +112,9 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 			"platform": string(p.Platform()),
+ 		},
+ 	}
++	if scripted {
++		art.Meta["model"] = string(ModelScripted)
++	}
+ 
+ 	// Establish how isolation is proven for this run, and record it either way.
+ 	//
+@@ -169,6 +179,11 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 			"api.anthropic.com", "statsig.anthropic.com", "*.anthropic.com",
+ 		},
+ 	}
++	if scripted {
++		// The model is on loopback, so the agent needs no egress at all. Asked for rather than
++		// assumed, so a provider that enforces egress enforces this; LocalExec cannot, and does not.
++		launch.BlockEgress, launch.EgressAllowDomains = true, nil
++	}
+ 	if sc.NeedsRealSystemd() {
+ 		// The VM lane has a real kernel and cgroup2, which dockerd needs; the default lane does
+ 		// not. Neither lane makes our entrypoint PID 1, hence the nested container -- see
+@@ -257,6 +272,20 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 	logPath := sh.Join(lay.WorkDir, "runtime.jsonl")
+ 	prompt := scenario.Expand(sc.Prompt, canary, sentinel, lay.WorkDir)
+ 
++	// The session reaches the scripted model through its environment, and only the session does:
++	// the stand-in is up for exactly as long as the agent might call it.
++	var sessionEnv [][2]string
++	if scripted {
++		model, err := startScripted(sc, canary, sentinel, lay.WorkDir)
++		if err != nil {
++			return art, err
++		}
++		defer model.Close()
++		defer recordScripted(model, len(sc.Script), runDir, &art, logf)
++		logf("scripted model on %s (%d step(s))", model.URL, len(sc.Script))
++		sessionEnv = scriptedSessionEnv(model.URL)
++	}
++
+ 	// Start the credential sampler BEFORE the session, so it observes the agent's own
+ 	// processes while they are alive. See shell.ArgvSampler.
+ 	if _, err := p.Exec(ctx, inst, sh.ArgvSampler(), sandbox.ExecOpts{
+@@ -307,7 +336,8 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 		}
+ 		logf("running session against the installed endpoint (budget $%.2f, timeout %s)",
+ 			sc.Budget(), sc.Timeout())
+-		res, err = g.Exec(ctx, sh.PlainSession(sessionDir, claudeFlags(sc, prompt, sh)), sessionOpts)
++		res, err = g.Exec(ctx, withSessionEnv(sh, sessionEnv,
++			sh.PlainSession(sessionDir, claudeFlags(sc, prompt, sh))), sessionOpts)
+ 		if err != nil {
+ 			logf("session exec error: %v", err)
+ 		}
+@@ -315,7 +345,8 @@ func Run(ctx context.Context, p sandbox.Provider, sc scenario.Scenario, opts Opt
+ 	} else {
+ 		logf("running session (budget $%.2f, timeout %s)", sc.Budget(), sc.Timeout())
+ 		var err error
+-		res, err = g.Exec(ctx, sh.CIExecSession(logPath, sessionDir, claudeFlags(sc, prompt, sh)), sessionOpts)
++		res, err = g.Exec(ctx, withSessionEnv(sh, sessionEnv,
++			sh.CIExecSession(logPath, sessionDir, claudeFlags(sc, prompt, sh))), sessionOpts)
+ 		if err != nil {
+ 			logf("session exec error: %v", err)
+ 		}
+diff --git a/beacon-sandbox/runner/scripted.go b/beacon-sandbox/runner/scripted.go
+new file mode 100644
+index 00000000..d9e0666b
+--- /dev/null
++++ b/beacon-sandbox/runner/scripted.go
+@@ -0,0 +1,123 @@
++package runner
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/scenario"
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/scriptedmodel"
++)
++
++// Model selects what answers the agent.
++type Model string
++
++const (
++	// ModelAnthropic is the real Messages API, and the default: a run is a real agent session.
++	ModelAnthropic Model = "anthropic"
++	// ModelScripted is the scenario's own script, served on loopback by scriptedmodel. No
++	// credential, no API spend, and nothing leaves the machine on the model's behalf.
++	ModelScripted Model = "scripted"
++)
++
++// ParseModel reads the --model flag. Empty is the default.
++func ParseModel(s string) (Model, error) {
++	switch Model(strings.TrimSpace(s)) {
++	case "", ModelAnthropic:
++		return ModelAnthropic, nil
++	case ModelScripted:
++		return ModelScripted, nil
++	}
++	return "", fmt.Errorf("unknown --model %q; want %s or %s", s, ModelAnthropic, ModelScripted)
++}
++
++// ScriptedTranscriptName is where a scripted run records every request the model answered.
++const ScriptedTranscriptName = "scripted-model.json"
++
++// scriptedFinalText is the reply that ends a scripted session.
++const scriptedFinalText = "scripted session complete"
++
++// scriptedToken is what Claude Code presents to the scripted model. It has to present something or
++// it will not start; the stand-in accepts anything, so this is a fixed placeholder, not a secret.
++const scriptedToken = "beacon-sandbox-scripted-model"
++
++// checkScripted refuses a scripted run that cannot work, before anything is built or launched.
++//
++// The model is served from this process on 127.0.0.1, so it is reachable only when the guest is
++// this machine. Every remote provider puts the agent somewhere that address means something else.
++func checkScripted(mutatesHost bool, providerName string, sc scenario.Scenario) error {
++	if !mutatesHost {
++		return fmt.Errorf("--model scripted serves the model from this process on loopback, which "+
++			"the %s guest cannot reach; it needs --provider local", providerName)
++	}
++	if !sc.HasScript() {
++		return fmt.Errorf("%s has no script:, so there is nothing for the scripted model to do", sc.ID)
++	}
++	return nil
++}
++
++// startScripted serves the scenario's script with this run's placeholders expanded.
++func startScripted(sc scenario.Scenario, canary, sentinel, workdir string) (*scriptedmodel.Listening, error) {
++	steps := make([]scriptedmodel.Step, len(sc.Script))
++	for i, st := range sc.Script {
++		steps[i] = scriptedmodel.Step{
++			Tool:  st.Tool,
++			Input: scenario.ExpandInput(st.Input, canary, sentinel, workdir),
++		}
++	}
++	return scriptedmodel.Listen(scriptedmodel.Script{Steps: steps, FinalText: scriptedFinalText})
++}
++
++// scriptedSessionEnv points Claude Code at the scripted model.
++//
++// The real credentials are blanked rather than left alone. On the local provider the session
++// inherits this process's environment, and a CI job that also runs real-model scenarios has a key
++// there; Claude Code would then send it to the stand-in, and the run would no longer be the
++// keyless one it claims to be. The non-essential traffic switch keeps Claude Code's update check
++// and error reporting off the network; it does not affect the OpenTelemetry export Beacon reads.
++func scriptedSessionEnv(url string) [][2]string {
++	return [][2]string{
++		{"ANTHROPIC_BASE_URL", url},
++		{"ANTHROPIC_AUTH_TOKEN", scriptedToken},
++		{"ANTHROPIC_API_KEY", ""},
++		{"CLAUDE_CODE_OAUTH_TOKEN", ""},
++		{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1"},
++	}
++}
++
++// withSessionEnv prefixes a session script with environment assignments, in order.
++func withSessionEnv(sh shell, env [][2]string, script string) string {
++	for i := len(env) - 1; i >= 0; i-- {
++		script = sh.WithEnv(env[i][0], env[i][1], script)
++	}
++	return script
++}
++
++// recordScripted writes the transcript and summarizes it into meta.
++//
++// Steps sent against steps scripted is the number to read first on a scripted run that did not
++// pass: fewer sent than scripted means the session ended early, and the transcript says where.
++func recordScripted(m *scriptedmodel.Listening, steps int, runDir string, art *Artifacts,
++	logf func(string, ...any)) {
++
++	ex := m.Exchanges()
++	art.Meta["scripted_steps_sent"] = fmt.Sprintf("%d/%d", m.StepsSent(), steps)
++	kinds := map[string]int{}
++	for _, e := range ex {
++		kinds[e.Kind]++
++		if e.Reply == "unsupported" {
++			art.Meta["scripted_stopped"] = oneLine(e.Detail)
++			logf("%s", e.Detail)
++		}
++	}
++	art.Meta["scripted_requests"] = fmt.Sprintf("turn=%d side=%d count_tokens=%d unrouted=%d",
++		kinds[scriptedmodel.KindTurn], kinds[scriptedmodel.KindSide],
++		kinds[scriptedmodel.KindCountTokens], kinds[scriptedmodel.KindUnrouted])
++	logf("scripted model: %s steps sent; requests %s",
++		art.Meta["scripted_steps_sent"], art.Meta["scripted_requests"])
++	if b, err := json.MarshalIndent(ex, "", "  "); err == nil {
++		_ = os.WriteFile(filepath.Join(runDir, ScriptedTranscriptName), append(b, '\n'), 0o600)
++	}
++}
+diff --git a/beacon-sandbox/runner/scripted_test.go b/beacon-sandbox/runner/scripted_test.go
+new file mode 100644
+index 00000000..6d556236
+--- /dev/null
++++ b/beacon-sandbox/runner/scripted_test.go
+@@ -0,0 +1,146 @@
++package runner
++
++import (
++	"encoding/json"
++	"net/http"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/scenario"
++	"github.com/asymptote-labs/agent-beacon/beacon-sandbox/scriptedmodel"
++)
++
++func TestParseModel(t *testing.T) {
++	for in, want := range map[string]Model{"": ModelAnthropic, "anthropic": ModelAnthropic,
++		"scripted": ModelScripted, " scripted ": ModelScripted} {
++		got, err := ParseModel(in)
++		if err != nil || got != want {
++			t.Errorf("ParseModel(%q) = %q, %v; want %q", in, got, err, want)
++		}
++	}
++	for _, bad := range []string{"claude-sonnet-4-5", "Scripted", "mock"} {
++		if _, err := ParseModel(bad); err == nil {
++			t.Errorf("ParseModel(%q) accepted a value that selects nothing", bad)
++		}
++	}
++}
++
++// The scripted model lives on this process's loopback, so any provider whose guest is another
++// machine would have the agent call an address that means something else there. Refused before a
++// sandbox is paid for, as is a scenario with nothing scripted.
++func TestCheckScriptedRefusesWhatCannotWork(t *testing.T) {
++	withScript := scenario.Scenario{ID: "s", Script: []scenario.ScriptStep{{Tool: "Bash"}}}
++	if err := checkScripted(false, "modal", withScript); err == nil ||
++		!strings.Contains(err.Error(), "--provider local") {
++		t.Errorf("a remote guest must be refused with the provider that works, got %v", err)
++	}
++	if err := checkScripted(true, "local", scenario.Scenario{ID: "s"}); err == nil {
++		t.Error("a scenario without a script must be refused")
++	}
++	if err := checkScripted(true, "local", withScript); err != nil {
++		t.Errorf("local with a script should be accepted: %v", err)
++	}
++}
++
++// Without the scripted model the session script must be byte-for-byte what it was, so a default
++// run is unchanged by this feature.
++func TestNoSessionEnvLeavesTheScriptUnchanged(t *testing.T) {
++	sh := posixShell{}
++	script := sh.CIExecSession("/w/runtime.jsonl", "/w", []string{"-p", "'hi'"})
++	if got := withSessionEnv(sh, nil, script); got != script {
++		t.Errorf("an empty env changed the session script:\n%s\nvs\n%s", got, script)
++	}
++}
++
++// The assignments must land on `beacon ci exec` itself -- a POSIX prefix applies only to the one
++// command it precedes -- and must reach the process it starts, which is how Claude Code sees them.
++// Run through a real shell, because the property is about how sh parses the line.
++func TestSessionEnvReachesTheWrappedCommand(t *testing.T) {
++	sh := posixShell{}
++	env := scriptedSessionEnv("http://127.0.0.1:9")
++
++	wrapped := withSessionEnv(sh, env, sh.CIExecSession("/w/runtime.jsonl", "/w", []string{"-p", "x"}))
++	if !strings.Contains(wrapped, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1' beacon ci exec ") {
++		t.Errorf("the assignments do not immediately precede beacon ci exec:\n%s", wrapped)
++	}
++
++	probe := withSessionEnv(sh, env,
++		`sh -c 'echo "url=$ANTHROPIC_BASE_URL token=$ANTHROPIC_AUTH_TOKEN key=[${ANTHROPIC_API_KEY-unset}]"'`)
++	cmd := exec.Command("sh", "-c", probe)
++	// A real key in the parent environment is the case that matters: it must not reach the agent.
++	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=sk-ant-real", "CLAUDE_CODE_OAUTH_TOKEN=real")
++	out, err := cmd.Output()
++	if err != nil {
++		t.Fatalf("sh: %v", err)
++	}
++	want := "url=http://127.0.0.1:9 token=" + scriptedToken + " key=[]"
++	if got := strings.TrimSpace(string(out)); got != want {
++		t.Errorf("child saw %q, want %q", got, want)
++	}
++}
++
++// PowerShell has no prefix form; the assignments become statements ahead of the script.
++func TestSessionEnvInPowerShellIsStatements(t *testing.T) {
++	got := withSessionEnv(powerShell{}, [][2]string{{"A", "x"}, {"B", ""}}, "& claude")
++	if want := "$env:A = 'x'; $env:B = ''; & claude"; got != want {
++		t.Errorf("got %q, want %q", got, want)
++	}
++}
++
++// Placeholders are expanded with this run's values before the server sees the script, and what
++// it answered is written to the run directory and summarized in meta.
++func TestScriptedServerIsExpandedAndRecorded(t *testing.T) {
++	sc := scenario.Scenario{ID: "s", Script: []scenario.ScriptStep{
++		{Tool: "Bash", Input: map[string]any{"command": "echo {{canary}} | tee {{sentinel}}"}},
++		{Tool: "Write", Input: map[string]any{"file_path": "{{workdir}}/x"}},
++	}}
++	m, err := startScripted(sc, "C1", "/w/s.sentinel", "/w")
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer m.Close()
++
++	body := `{"model":"m","tools":[{"name":"Bash"}],"messages":[]}`
++	resp, err := http.Post(m.URL+"/v1/messages", "application/json", strings.NewReader(body))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var r struct {
++		Content []struct {
++			Input map[string]any `json:"input"`
++		} `json:"content"`
++	}
++	_ = json.NewDecoder(resp.Body).Decode(&r)
++	resp.Body.Close()
++	if len(r.Content) != 1 || r.Content[0].Input["command"] != "echo C1 | tee /w/s.sentinel" {
++		t.Fatalf("step 0 was not expanded: %+v", r)
++	}
++	// Step 1 calls Write, which this request does not offer, so the session is ended there.
++	resp, err = http.Post(m.URL+"/v1/messages", "application/json", strings.NewReader(body))
++	if err != nil {
++		t.Fatal(err)
++	}
++	resp.Body.Close()
++
++	dir := t.TempDir()
++	art := Artifacts{Meta: map[string]string{}}
++	recordScripted(m, len(sc.Script), dir, &art, func(string, ...any) {})
++	if art.Meta["scripted_steps_sent"] != "1/2" {
++		t.Errorf("scripted_steps_sent = %q, want 1/2", art.Meta["scripted_steps_sent"])
++	}
++	if !strings.Contains(art.Meta["scripted_stopped"], "Write") {
++		t.Errorf("scripted_stopped = %q, want it to name the tool that was not offered",
++			art.Meta["scripted_stopped"])
++	}
++	b, err := os.ReadFile(filepath.Join(dir, ScriptedTranscriptName))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var ex []scriptedmodel.Exchange
++	if err := json.Unmarshal(b, &ex); err != nil || len(ex) != 2 {
++		t.Errorf("transcript = %s (%v)", b, err)
++	}
++}
+diff --git a/beacon-sandbox/scenario/scenario.go b/beacon-sandbox/scenario/scenario.go
+index 3a5cc365..7f535f55 100644
+--- a/beacon-sandbox/scenario/scenario.go
++++ b/beacon-sandbox/scenario/scenario.go
+@@ -173,9 +173,27 @@ type Scenario struct {
+ 	// TimeoutSeconds bounds the session.
+ 	TimeoutSeconds int `yaml:"timeout_seconds,omitempty"`
+ 	// BlockEgress denies all outbound network. Only useful for scenarios that need no
+-	// model call, since Claude Code needs the API.
++	// model call, since Claude Code needs the API -- or for a run against the scripted model,
++	// which serves it on loopback.
+ 	BlockEgress bool     `yaml:"block_egress,omitempty"`
+ 	Expect      []Expect `yaml:"expect"`
++	// Script is what the scripted model answers with under `run --model scripted`, and is ignored
++	// otherwise. Each request that offers tools gets the next step as a tool call; once the steps
++	// run out the session ends with a text reply. Placeholders in an input are expanded like the
++	// prompt's.
++	//
++	// It is the decisions only. Claude Code still runs every tool and emits its own telemetry, so
++	// what Beacon captures is real; what is scripted is that the agent does exactly this, which
++	// removes the model's freedom to paraphrase a command or skip the work.
++	Script []ScriptStep `yaml:"script,omitempty"`
++}
++
++// ScriptStep is one tool call the scripted model makes.
++type ScriptStep struct {
++	// Tool is the tool's name as Claude Code offers it, e.g. "Bash" or "Write".
++	Tool string `yaml:"tool"`
++	// Input is the call's arguments, in the tool's own schema.
++	Input map[string]any `yaml:"input,omitempty"`
+ }
+ 
+ // Suite is an ordered set of scenarios loaded from a directory.
+@@ -245,6 +263,9 @@ func (s Scenario) Validate() error {
+ 				"{{workdir}} or a drive-qualified path", s.ID, s.Sentinel)
+ 		}
+ 	}
++	if err := s.validateScript(); err != nil {
++		return err
++	}
+ 	for i, e := range s.Expect {
+ 		if strings.TrimSpace(e.Action) == "" {
+ 			return fmt.Errorf("%s: expect[%d] is missing action", s.ID, i)
+@@ -330,6 +351,45 @@ func (s Scenario) Validate() error {
+ 	return nil
+ }
+ 
++// validateScript rejects a script that could never play out as written.
++//
++// The scripted model ends the session at the first step whose tool the session does not offer, so
++// a step naming a tool the scenario itself restricted away would make every scripted run of it
++// stop there -- after a sandbox has been paid for, and reading as an idle agent.
++func (s Scenario) validateScript() error {
++	for i, st := range s.Script {
++		tool := strings.TrimSpace(st.Tool)
++		if tool == "" {
++			return fmt.Errorf("%s: script[%d] is missing tool", s.ID, i)
++		}
++		if tool != st.Tool {
++			return fmt.Errorf("%s: script[%d] tool %q has surrounding whitespace, so it would "+
++				"never match an offered tool", s.ID, i, st.Tool)
++		}
++		if s.Tools != nil && !namesTool(s.Tools, tool) {
++			return fmt.Errorf("%s: script[%d] calls %s, which tools: does not allow", s.ID, i, tool)
++		}
++		if namesTool(s.DisallowedTools, tool) {
++			return fmt.Errorf("%s: script[%d] calls %s, which disallowed_tools removes", s.ID, i, tool)
++		}
++	}
++	return nil
++}
++
++// namesTool reports whether a Claude Code tool list names the tool, bare or with a rule such as
++// "Bash(git:*)".
++func namesTool(list []string, tool string) bool {
++	for _, t := range list {
++		if t == tool || strings.HasPrefix(t, tool+"(") {
++			return true
++		}
++	}
++	return false
++}
++
++// HasScript reports whether the scenario can run against the scripted model.
++func (s Scenario) HasScript() bool { return len(s.Script) > 0 }
++
+ // Load reads one scenario file.
+ func Load(path string) (Scenario, error) {
+ 	var s Scenario
+@@ -389,6 +449,20 @@ func (s Suite) For(p Platform) (matching Suite, skipped int) {
+ 	return out, skipped
+ }
+ 
++// Scripted returns the scenarios that carry a script, reporting how many were set aside for the
++// same reason For does: a suite run that quietly shrank would read as full coverage.
++func (s Suite) Scripted() (matching Suite, skipped int) {
++	out := Suite{Name: s.Name}
++	for _, sc := range s.Scenarios {
++		if sc.HasScript() {
++			out.Scenarios = append(out.Scenarios, sc)
++			continue
++		}
++		skipped++
++	}
++	return out, skipped
++}
++
+ // Expand substitutes run-scoped placeholders into a template string.
+ func Expand(tmpl string, canary, sentinel, workdir string) string {
+ 	r := strings.NewReplacer(
+@@ -399,6 +473,38 @@ func Expand(tmpl string, canary, sentinel, workdir string) string {
+ 	return r.Replace(tmpl)
+ }
+ 
++// ExpandInput substitutes run-scoped placeholders into every string of a script step's input,
++// however deeply nested, and returns a copy. The scenario's own value is left untouched, because
++// the same scenario is expanded again with a fresh canary on every --repeat.
++func ExpandInput(in map[string]any, canary, sentinel, workdir string) map[string]any {
++	if in == nil {
++		return nil
++	}
++	out, _ := expandValue(in, canary, sentinel, workdir).(map[string]any)
++	return out
++}
++
++func expandValue(v any, canary, sentinel, workdir string) any {
++	switch t := v.(type) {
++	case string:
++		return Expand(t, canary, sentinel, workdir)
++	case map[string]any:
++		out := make(map[string]any, len(t))
++		for k, e := range t {
++			out[k] = expandValue(e, canary, sentinel, workdir)
++		}
++		return out
++	case []any:
++		out := make([]any, len(t))
++		for i, e := range t {
++			out[i] = expandValue(e, canary, sentinel, workdir)
++		}
++		return out
++	default:
++		return v
++	}
++}
++
+ // setupPlantsSentinel reports whether a setup step would create the sentinel before the session.
+ //
+ // Expansion happens first so the three equivalent spellings are all caught: the {{sentinel}}
+diff --git a/beacon-sandbox/scenario/script_test.go b/beacon-sandbox/scenario/script_test.go
+new file mode 100644
+index 00000000..231f4c5d
+--- /dev/null
++++ b/beacon-sandbox/scenario/script_test.go
+@@ -0,0 +1,168 @@
++package scenario
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// A script is decoded from YAML into plain maps, nested values included, because the scripted
++// model marshals the input to JSON verbatim. yaml.v3 decodes a nested mapping to map[string]any,
++// which marshals; a map[any]any would not.
++func TestScriptDecodesFromYAML(t *testing.T) {
++	dir := t.TempDir()
++	p := filepath.Join(dir, "x.yaml")
++	body := `id: t-script
++prompt: run it
++expect:
++  - action: command.executed
++    why: test
++script:
++  - tool: Bash
++    input:
++      command: echo {{canary}}
++      nested: {list: ["{{sentinel}}", 3]}
++  - tool: Write
++`
++	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	s, err := Load(p)
++	if err != nil {
++		t.Fatalf("Load: %v", err)
++	}
++	if len(s.Script) != 2 || s.Script[0].Tool != "Bash" || s.Script[1].Tool != "Write" {
++		t.Fatalf("script decoded as %+v", s.Script)
++	}
++	nested, ok := s.Script[0].Input["nested"].(map[string]any)
++	if !ok {
++		t.Fatalf("a nested mapping decoded as %T, which does not marshal to JSON",
++			s.Script[0].Input["nested"])
++	}
++	if list, ok := nested["list"].([]any); !ok || len(list) != 2 {
++		t.Errorf("nested list decoded as %#v", nested["list"])
++	}
++	if s.Script[1].Input != nil {
++		t.Errorf("a step without input should decode to nil input, got %#v", s.Script[1].Input)
++	}
++	if !s.HasScript() {
++		t.Error("HasScript is false for a scenario with a script")
++	}
++}
++
++// A misspelled key inside a step must fail the load, the same as anywhere else in a scenario.
++func TestScriptRejectsUnknownStepFields(t *testing.T) {
++	dir := t.TempDir()
++	p := filepath.Join(dir, "x.yaml")
++	body := "id: t\nprompt: p\nexpect: [{action: a, why: w}]\nscript:\n  - tool: Bash\n    inputs: {}\n"
++	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Load(p); err == nil {
++		t.Error("`inputs:` loaded without error, so the step would silently run with no input")
++	}
++}
++
++// Each of these could never play out: the scripted model ends the session at the first step whose
++// tool is not offered, which would read as an idle agent after a sandbox was already paid for.
++func TestValidateRejectsAScriptThatCannotPlayOut(t *testing.T) {
++	cases := map[string]func(*Scenario){
++		"missing tool":    func(s *Scenario) { s.Script = []ScriptStep{{}} },
++		"whitespace tool": func(s *Scenario) { s.Script = []ScriptStep{{Tool: " Bash"}} },
++		"tool not in tools:": func(s *Scenario) {
++			s.Tools = []string{"Write"}
++			s.Script = []ScriptStep{{Tool: "Bash"}}
++		},
++		"tools: [] offers nothing": func(s *Scenario) {
++			s.Tools = []string{}
++			s.Script = []ScriptStep{{Tool: "Bash"}}
++		},
++		"tool disallowed": func(s *Scenario) {
++			s.DisallowedTools = []string{"Bash"}
++			s.Script = []ScriptStep{{Tool: "Bash"}}
++		},
++	}
++	for name, mutate := range cases {
++		s := valid()
++		mutate(&s)
++		if err := s.Validate(); err == nil {
++			t.Errorf("%s: expected a validation error, got nil", name)
++		}
++	}
++}
++
++func TestValidateAcceptsAScriptTheToolListAllows(t *testing.T) {
++	s := valid()
++	s.Tools = []string{"Bash(echo:*)", "Write"}
++	s.Script = []ScriptStep{{Tool: "Bash"}, {Tool: "Write"}}
++	if err := s.Validate(); err != nil {
++		t.Errorf("a tool allowed with a rule should count as offered: %v", err)
++	}
++}
++
++func TestScriptedSelectsScenariosWithAScriptAndCountsTheRest(t *testing.T) {
++	with, without := valid(), valid()
++	with.ID, without.ID = "with", "without"
++	with.Script = []ScriptStep{{Tool: "Bash"}}
++	got, skipped := Suite{Name: "s", Scenarios: []Scenario{without, with}}.Scripted()
++	if len(got.Scenarios) != 1 || got.Scenarios[0].ID != "with" || skipped != 1 {
++		t.Errorf("Scripted() = %v ids, skipped %d", got.Scenarios, skipped)
++	}
++}
++
++// Placeholders are expanded at every depth, and the scenario's own value is not modified --
++// --repeat expands the same scenario again with a different canary.
++func TestExpandInputIsDeepAndDoesNotMutate(t *testing.T) {
++	in := map[string]any{
++		"command": "echo {{canary}}",
++		"nested":  map[string]any{"path": "{{workdir}}/x", "n": 3},
++		"list":    []any{"{{sentinel}}", true},
++	}
++	out := ExpandInput(in, "C1", "/w/s", "/w")
++	if out["command"] != "echo C1" {
++		t.Errorf("command = %v", out["command"])
++	}
++	if out["nested"].(map[string]any)["path"] != "/w/x" || out["nested"].(map[string]any)["n"] != 3 {
++		t.Errorf("nested = %v", out["nested"])
++	}
++	if l := out["list"].([]any); l[0] != "/w/s" || l[1] != true {
++		t.Errorf("list = %v", l)
++	}
++	if in["command"] != "echo {{canary}}" || in["nested"].(map[string]any)["path"] != "{{workdir}}/x" {
++		t.Error("ExpandInput modified the scenario's own input")
++	}
++	if ExpandInput(nil, "c", "s", "w") != nil {
++		t.Error("a nil input should stay nil")
++	}
++}
++
++// The shipped scripts must do what their prompts ask. A script that drifted from its prompt would
++// make a scripted run assert something other than the real-model run of the same scenario.
++func TestShippedScriptsMatchTheirPrompts(t *testing.T) {
++	suite, err := LoadSuite("../scenarios")
++	if err != nil {
++		t.Fatalf("LoadSuite: %v", err)
++	}
++	scripted, _ := suite.Scripted()
++	if len(scripted.Scenarios) == 0 {
++		t.Fatal("no shipped scenario has a script, so `run --model scripted` has nothing to run")
++	}
++	for _, sc := range scripted.Scenarios {
++		const canary = "BEACON_SANDBOX_TEST"
++		sentinel := Expand(sc.Sentinel, canary, "", "/home/agent/work")
++		prompt := Expand(sc.Prompt, canary, sentinel, "/home/agent/work")
++		for i, st := range sc.Script {
++			in := ExpandInput(st.Input, canary, sentinel, "/home/agent/work")
++			for k, v := range in {
++				str, ok := v.(string)
++				if !ok || k == "description" {
++					continue
++				}
++				if !strings.Contains(prompt, strings.TrimSpace(str)) {
++					t.Errorf("%s: script[%d].%s = %q is not what the prompt asks for", sc.ID, i, k, str)
++				}
++			}
++		}
++	}
++}
+diff --git a/beacon-sandbox/scenarios/s02-bash-command.yaml b/beacon-sandbox/scenarios/s02-bash-command.yaml
+index ced6adf4..40ba60d1 100644
+--- a/beacon-sandbox/scenarios/s02-bash-command.yaml
++++ b/beacon-sandbox/scenarios/s02-bash-command.yaml
+@@ -14,6 +14,12 @@ prompt: >-
+ sentinel: /home/agent/work/s02.sentinel
+ budget_usd: 1.0
+ timeout_seconds: 300
++# What the scripted model does under `run --model scripted`: the same command the prompt asks for.
++script:
++  - tool: Bash
++    input:
++      command: echo {{canary}} | tee {{sentinel}}
++      description: Echo the canary into the sentinel
+ 
+ expect:
+   - action: prompt.submitted
+diff --git a/beacon-sandbox/scenarios/s03-file-write.yaml b/beacon-sandbox/scenarios/s03-file-write.yaml
+index 91266d40..733246a6 100644
+--- a/beacon-sandbox/scenarios/s03-file-write.yaml
++++ b/beacon-sandbox/scenarios/s03-file-write.yaml
+@@ -12,6 +12,12 @@ prompt: >-
+ sentinel: /home/agent/work/s03-written.txt
+ budget_usd: 1.0
+ timeout_seconds: 300
++# What the scripted model does under `run --model scripted`: the write the prompt asks for.
++script:
++  - tool: Write
++    input:
++      file_path: "{{sentinel}}"
++      content: "{{canary}}\n"
+ 
+ expect:
+   - action: prompt.submitted
+diff --git a/beacon-sandbox/scriptedmodel/scriptedmodel.go b/beacon-sandbox/scriptedmodel/scriptedmodel.go
+new file mode 100644
+index 00000000..e577a0e4
+--- /dev/null
++++ b/beacon-sandbox/scriptedmodel/scriptedmodel.go
+@@ -0,0 +1,324 @@
++// Package scriptedmodel is a loopback stand-in for the Anthropic Messages API that answers from a
++// fixed script instead of a model.
++//
++// It exists so a scenario can run with no Anthropic credential and no egress. Claude Code is
++// pointed at it with ANTHROPIC_BASE_URL and does everything else for real -- runs the tools, emits
++// its telemetry, writes the sentinel -- so what Beacon captures is genuine Claude Code output. Only
++// the decisions are scripted, which also makes them deterministic: the agent cannot paraphrase a
++// command or skip the work, so an INCONCLUSIVE verdict from a scripted run points at the harness,
++// not at the model.
++//
++// Requests fall into three kinds, and only one of them moves the script forward:
++//
++//	turn          POST /v1/messages offering tools: answered with the next step as a tool call,
++//	              then, once the steps run out, with the final text and end_turn
++//	side          POST /v1/messages offering no tools (titles, summaries, quota probes):
++//	              answered with a short text, script untouched
++//	count_tokens  POST /v1/messages/count_tokens: a fixed count, script untouched
++//
++// Side requests must not advance. Claude Code sends them at times that vary between versions, and
++// a side request that consumed a step would send the next tool call to nobody and the session would
++// end one step short.
++package scriptedmodel
++
++import (
++	"crypto/rand"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++	"io"
++	"net"
++	"net/http"
++	"sync"
++	"time"
++)
++
++// Step is one tool call the scripted model makes.
++type Step struct {
++	Tool  string         `json:"tool"`
++	Input map[string]any `json:"input,omitempty"`
++}
++
++// Script is everything the model will say, in order.
++type Script struct {
++	Steps []Step
++	// FinalText is the reply that ends the session once every step has been sent.
++	FinalText string
++}
++
++// Request kinds, as recorded in an Exchange.
++const (
++	KindTurn        = "turn"
++	KindSide        = "side"
++	KindCountTokens = "count_tokens"
++	KindUnrouted    = "unrouted"
++)
++
++// SideText answers every side request. It is deliberately not the final text, so a transcript
++// shows at a glance which reply ended the session.
++const SideText = "scripted side reply"
++
++// Exchange records one request and how it was answered, for the run directory.
++type Exchange struct {
++	Kind string `json:"kind"`
++	Path string `json:"path"`
++	// Step is the index of the step sent, or -1 when the reply was not a step.
++	Step int    `json:"step"`
++	Tool string `json:"tool,omitempty"`
++	// Reply is tool_use, text, unsupported (the step's tool was not offered) or error.
++	Reply  string `json:"reply"`
++	Detail string `json:"detail,omitempty"`
++}
++
++// Server is an http.Handler serving the script. Safe for concurrent use.
++type Server struct {
++	script Script
++
++	mu   sync.Mutex
++	next int
++	// stopped is set when a step could not be sent. The session is then ended rather than handed
++	// the steps after it, which would run against state the skipped step never created.
++	stopped bool
++	log     []Exchange
++}
++
++// New returns a server for the script.
++func New(script Script) *Server {
++	return &Server{script: script}
++}
++
++// Exchanges returns what has been served so far.
++func (s *Server) Exchanges() []Exchange {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	return append([]Exchange(nil), s.log...)
++}
++
++// StepsSent reports how many steps went out as tool calls.
++func (s *Server) StepsSent() int {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	n := 0
++	for _, e := range s.log {
++		if e.Reply == "tool_use" {
++			n++
++		}
++	}
++	return n
++}
++
++// request is the part of a Messages API request the script needs.
++type request struct {
++	Model  string `json:"model"`
++	Stream bool   `json:"stream"`
++	Tools  []struct {
++		Name string `json:"name"`
++	} `json:"tools"`
++}
++
++func (r request) offers(name string) bool {
++	for _, t := range r.Tools {
++		if t.Name == name {
++			return true
++		}
++	}
++	return false
++}
++
++// block is one content block of a reply.
++type block struct {
++	Type  string         `json:"type"`
++	Text  string         `json:"text,omitempty"`
++	ID    string         `json:"id,omitempty"`
++	Name  string         `json:"name,omitempty"`
++	Input map[string]any `json:"input,omitempty"`
++}
++
++func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
++	// Claude Code appends ?beta=true, so the route is matched on the path alone.
++	path := r.URL.Path
++	if r.Method != http.MethodPost || (path != "/v1/messages" && path != "/v1/messages/count_tokens") {
++		s.record(Exchange{Kind: KindUnrouted, Path: path, Step: -1, Reply: "error",
++			Detail: r.Method + " " + path})
++		writeError(w, http.StatusNotFound, "not_found_error",
++			fmt.Sprintf("the scripted model serves only POST /v1/messages; got %s %s", r.Method, path))
++		return
++	}
++	raw, err := io.ReadAll(io.LimitReader(r.Body, 64<<20))
++	if err != nil {
++		writeError(w, http.StatusBadRequest, "invalid_request_error", "reading body: "+err.Error())
++		return
++	}
++	if path == "/v1/messages/count_tokens" {
++		s.record(Exchange{Kind: KindCountTokens, Path: path, Step: -1, Reply: "count"})
++		w.Header().Set("Content-Type", "application/json")
++		_, _ = w.Write([]byte(`{"input_tokens":1000}`))
++		return
++	}
++	var req request
++	if err := json.Unmarshal(raw, &req); err != nil {
++		s.record(Exchange{Kind: KindUnrouted, Path: path, Step: -1, Reply: "error", Detail: err.Error()})
++		writeError(w, http.StatusBadRequest, "invalid_request_error", "body is not JSON: "+err.Error())
++		return
++	}
++
++	blocks, ex := s.answer(req)
++	ex.Path = path
++	s.record(ex)
++	if req.Stream {
++		writeStream(w, req.Model, blocks)
++		return
++	}
++	writeMessage(w, req.Model, blocks)
++}
++
++// answer decides the reply and advances the script when the request is a turn.
++func (s *Server) answer(req request) ([]block, Exchange) {
++	if len(req.Tools) == 0 {
++		return []block{{Type: "text", Text: SideText}},
++			Exchange{Kind: KindSide, Step: -1, Reply: "text"}
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.stopped || s.next >= len(s.script.Steps) {
++		return []block{{Type: "text", Text: s.script.FinalText}},
++			Exchange{Kind: KindTurn, Step: -1, Reply: "text"}
++	}
++	i := s.next
++	step := s.script.Steps[i]
++	if !req.offers(step.Tool) {
++		// Said in the reply as well as in the record, because the reply is what lands in Claude
++		// Code's own result file -- the first thing anyone debugging the run reads.
++		s.stopped = true
++		msg := fmt.Sprintf("scripted model: step %d calls %s, which this session does not offer",
++			i, step.Tool)
++		return []block{{Type: "text", Text: msg}},
++			Exchange{Kind: KindTurn, Step: i, Tool: step.Tool, Reply: "unsupported", Detail: msg}
++	}
++	s.next++
++	input := step.Input
++	if input == nil {
++		input = map[string]any{}
++	}
++	return []block{{Type: "tool_use", ID: toolUseID(i), Name: step.Tool, Input: input}},
++		Exchange{Kind: KindTurn, Step: i, Tool: step.Tool, Reply: "tool_use"}
++}
++
++func (s *Server) record(e Exchange) {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	s.log = append(s.log, e)
++}
++
++// toolUseID is unique per call, as the API's own are; Claude Code pairs results to calls by it.
++func toolUseID(step int) string {
++	b := make([]byte, 6)
++	_, _ = rand.Read(b)
++	return fmt.Sprintf("toolu_scripted_%02d_%s", step, hex.EncodeToString(b))
++}
++
++func stopReason(blocks []block) string {
++	for _, b := range blocks {
++		if b.Type == "tool_use" {
++			return "tool_use"
++		}
++	}
++	return "end_turn"
++}
++
++func messageID() string {
++	b := make([]byte, 12)
++	_, _ = rand.Read(b)
++	return "msg_scripted_" + hex.EncodeToString(b)
++}
++
++// usage is small and fixed. Claude Code prices it against --max-budget-usd, so it has to be
++// present and plausible, and it must never be large enough to trip the budget.
++var usage = map[string]int{
++	"input_tokens": 100, "output_tokens": 10,
++	"cache_creation_input_tokens": 0, "cache_read_input_tokens": 0,
++}
++
++func writeMessage(w http.ResponseWriter, model string, blocks []block) {
++	w.Header().Set("Content-Type", "application/json")
++	_ = json.NewEncoder(w).Encode(map[string]any{
++		"id": messageID(), "type": "message", "role": "assistant", "model": model,
++		"content": blocks, "stop_reason": stopReason(blocks), "stop_sequence": nil, "usage": usage,
++	})
++}
++
++// writeStream sends the reply as the Messages API's server-sent events: message_start, a
++// start/delta/stop triple per block, message_delta carrying the stop reason, message_stop.
++func writeStream(w http.ResponseWriter, model string, blocks []block) {
++	w.Header().Set("Content-Type", "text/event-stream")
++	w.Header().Set("Cache-Control", "no-cache")
++	flusher, _ := w.(http.Flusher)
++	event := func(name string, data map[string]any) {
++		data["type"] = name
++		b, _ := json.Marshal(data)
++		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, b)
++		if flusher != nil {
++			flusher.Flush()
++		}
++	}
++	event("message_start", map[string]any{"message": map[string]any{
++		"id": messageID(), "type": "message", "role": "assistant", "model": model,
++		"content": []any{}, "stop_reason": nil, "stop_sequence": nil, "usage": usage,
++	}})
++	for i, b := range blocks {
++		switch b.Type {
++		case "text":
++			event("content_block_start", map[string]any{"index": i,
++				"content_block": map[string]any{"type": "text", "text": ""}})
++			event("content_block_delta", map[string]any{"index": i,
++				"delta": map[string]any{"type": "text_delta", "text": b.Text}})
++		case "tool_use":
++			input, _ := json.Marshal(b.Input)
++			event("content_block_start", map[string]any{"index": i,
++				"content_block": map[string]any{"type": "tool_use", "id": b.ID, "name": b.Name,
++					"input": map[string]any{}}})
++			event("content_block_delta", map[string]any{"index": i,
++				"delta": map[string]any{"type": "input_json_delta", "partial_json": string(input)}})
++		}
++		event("content_block_stop", map[string]any{"index": i})
++	}
++	event("message_delta", map[string]any{
++		"delta": map[string]any{"stop_reason": stopReason(blocks), "stop_sequence": nil},
++		"usage": map[string]any{"output_tokens": usage["output_tokens"]},
++	})
++	event("message_stop", map[string]any{})
++}
++
++func writeError(w http.ResponseWriter, status int, kind, msg string) {
++	w.Header().Set("Content-Type", "application/json")
++	w.WriteHeader(status)
++	_ = json.NewEncoder(w).Encode(map[string]any{
++		"type": "error", "error": map[string]any{"type": kind, "message": msg},
++	})
++}
++
++// Listening is a server bound to a loopback port.
++type Listening struct {
++	*Server
++	// URL is the value for ANTHROPIC_BASE_URL.
++	URL string
++	srv *http.Server
++}
++
++// Close stops serving. Idempotent.
++func (l *Listening) Close() error { return l.srv.Close() }
++
++// Listen serves the script on 127.0.0.1 at a free port.
++//
++// Loopback only: the server answers anyone who can reach it, and nothing beyond this machine has
++// any business doing so.
++func Listen(script Script) (*Listening, error) {
++	ln, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		return nil, fmt.Errorf("scripted model: listen on loopback: %w", err)
++	}
++	s := New(script)
++	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
++	go func() { _ = srv.Serve(ln) }()
++	return &Listening{Server: s, URL: "http://" + ln.Addr().String(), srv: srv}, nil
++}
+diff --git a/beacon-sandbox/scriptedmodel/scriptedmodel_test.go b/beacon-sandbox/scriptedmodel/scriptedmodel_test.go
+new file mode 100644
+index 00000000..476059b5
+--- /dev/null
++++ b/beacon-sandbox/scriptedmodel/scriptedmodel_test.go
+@@ -0,0 +1,254 @@
++package scriptedmodel
++
++import (
++	"bufio"
++	"encoding/json"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++)
++
++func script() Script {
++	return Script{
++		Steps: []Step{
++			{Tool: "Bash", Input: map[string]any{"command": "echo hi"}},
++			{Tool: "Write", Input: map[string]any{"file_path": "/tmp/x", "content": "y"}},
++		},
++		FinalText: "done",
++	}
++}
++
++const withTools = `{"model":"m","stream":false,"tools":[{"name":"Bash"},{"name":"Write"}],` +
++	`"messages":[{"role":"user","content":"go"}]}`
++
++const noTools = `{"model":"m","stream":false,"system":"Generate a title",` +
++	`"messages":[{"role":"user","content":"go"}]}`
++
++type reply struct {
++	Content []struct {
++		Type  string         `json:"type"`
++		Text  string         `json:"text"`
++		ID    string         `json:"id"`
++		Name  string         `json:"name"`
++		Input map[string]any `json:"input"`
++	} `json:"content"`
++	StopReason string `json:"stop_reason"`
++}
++
++func post(t *testing.T, h http.Handler, path, body string) *httptest.ResponseRecorder {
++	t.Helper()
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)))
++	return rec
++}
++
++func decode(t *testing.T, rec *httptest.ResponseRecorder) reply {
++	t.Helper()
++	if rec.Code != http.StatusOK {
++		t.Fatalf("status %d: %s", rec.Code, rec.Body)
++	}
++	var r reply
++	if err := json.Unmarshal(rec.Body.Bytes(), &r); err != nil {
++		t.Fatalf("reply is not JSON: %v: %s", err, rec.Body)
++	}
++	return r
++}
++
++// Each request that offers tools gets the next step, in order, and the session ends on the final
++// text with end_turn. A script that stopped one step early, or never stopped, would leave the
++// sentinel unwritten or the session hanging until its timeout.
++func TestTurnsAdvanceThroughTheScriptAndEndWithEndTurn(t *testing.T) {
++	s := New(script())
++
++	first := decode(t, post(t, s, "/v1/messages?beta=true", withTools))
++	if first.StopReason != "tool_use" || len(first.Content) != 1 || first.Content[0].Name != "Bash" ||
++		first.Content[0].Input["command"] != "echo hi" {
++		t.Fatalf("first turn should call Bash with the scripted input, got %+v", first)
++	}
++	if !strings.HasPrefix(first.Content[0].ID, "toolu_") {
++		t.Errorf("tool_use id %q does not look like one Claude Code can pair a result with",
++			first.Content[0].ID)
++	}
++
++	second := decode(t, post(t, s, "/v1/messages", withTools))
++	if second.StopReason != "tool_use" || second.Content[0].Name != "Write" {
++		t.Fatalf("second turn should call Write, got %+v", second)
++	}
++	if second.Content[0].ID == first.Content[0].ID {
++		t.Error("two calls share an id, so their results cannot be told apart")
++	}
++
++	final := decode(t, post(t, s, "/v1/messages", withTools))
++	if final.StopReason != "end_turn" || final.Content[0].Type != "text" || final.Content[0].Text != "done" {
++		t.Fatalf("after the last step the session must end with the final text, got %+v", final)
++	}
++	// And it stays ended: a late request must not restart the script.
++	if again := decode(t, post(t, s, "/v1/messages", withTools)); again.StopReason != "end_turn" {
++		t.Errorf("a turn after the end restarted the script: %+v", again)
++	}
++	if got := s.StepsSent(); got != 2 {
++		t.Errorf("StepsSent = %d, want 2", got)
++	}
++}
++
++// Claude Code sends side requests -- titles, summaries, quota probes -- with no tools, at points
++// that differ between versions. One that consumed a step would hand the next tool call to a
++// request that cannot run it.
++func TestSideRequestsDoNotAdvanceTheScript(t *testing.T) {
++	s := New(script())
++
++	side := decode(t, post(t, s, "/v1/messages", noTools))
++	if side.StopReason != "end_turn" || side.Content[0].Text != SideText {
++		t.Fatalf("a side request should get the side text, got %+v", side)
++	}
++	if turn := decode(t, post(t, s, "/v1/messages", withTools)); turn.Content[0].Name != "Bash" {
++		t.Fatalf("the first turn after a side request must still get step 0, got %+v", turn)
++	}
++	decode(t, post(t, s, "/v1/messages", noTools))
++	if turn := decode(t, post(t, s, "/v1/messages", withTools)); turn.Content[0].Name != "Write" {
++		t.Fatalf("a side request between turns skipped a step, got %+v", turn)
++	}
++
++	var kinds []string
++	for _, e := range s.Exchanges() {
++		kinds = append(kinds, e.Kind)
++	}
++	if want := "side turn side turn"; strings.Join(kinds, " ") != want {
++		t.Errorf("recorded kinds %q, want %q", strings.Join(kinds, " "), want)
++	}
++}
++
++func TestCountTokensAnswersWithoutAdvancing(t *testing.T) {
++	s := New(script())
++
++	rec := post(t, s, "/v1/messages/count_tokens?beta=true", withTools)
++	if rec.Code != http.StatusOK {
++		t.Fatalf("count_tokens status %d", rec.Code)
++	}
++	var count struct {
++		InputTokens int `json:"input_tokens"`
++	}
++	if err := json.Unmarshal(rec.Body.Bytes(), &count); err != nil || count.InputTokens <= 0 {
++		t.Fatalf("count_tokens should return a positive input_tokens, got %s (%v)", rec.Body, err)
++	}
++	if turn := decode(t, post(t, s, "/v1/messages", withTools)); turn.Content[0].Name != "Bash" {
++		t.Fatalf("count_tokens consumed a step: %+v", turn)
++	}
++}
++
++// A step whose tool the session does not offer cannot run, and the steps after it would act on
++// state it never created. The session is ended, and the reason is put in the reply -- which lands
++// in Claude Code's own result file, the first place anyone looks.
++func TestAToolTheSessionDoesNotOfferEndsTheSession(t *testing.T) {
++	s := New(script())
++	onlyWrite := `{"model":"m","tools":[{"name":"Write"}],"messages":[]}`
++
++	r := decode(t, post(t, s, "/v1/messages", onlyWrite))
++	if r.StopReason != "end_turn" || !strings.Contains(r.Content[0].Text, "Bash") {
++		t.Fatalf("an unoffered tool should end the session naming it, got %+v", r)
++	}
++	if r := decode(t, post(t, s, "/v1/messages", withTools)); r.StopReason != "end_turn" ||
++		r.Content[0].Text != "done" {
++		t.Errorf("the script carried on after a step could not be sent: %+v", r)
++	}
++	if s.StepsSent() != 0 {
++		t.Errorf("StepsSent = %d, want 0", s.StepsSent())
++	}
++	if ex := s.Exchanges(); len(ex) == 0 || ex[0].Reply != "unsupported" || ex[0].Tool != "Bash" {
++		t.Errorf("the skipped step is not recorded as unsupported: %+v", ex)
++	}
++}
++
++// Claude Code streams. The reply has to be the Messages API's event sequence, with the tool input
++// carried as input_json_delta, or the client never assembles a call.
++func TestStreamedReplyIsTheMessagesEventSequence(t *testing.T) {
++	s := New(script())
++	rec := post(t, s, "/v1/messages", strings.Replace(withTools, `"stream":false`, `"stream":true`, 1))
++	if ct := rec.Header().Get("Content-Type"); ct != "text/event-stream" {
++		t.Fatalf("content type %q, want text/event-stream", ct)
++	}
++
++	var events []string
++	var partial string
++	var stop string
++	sc := bufio.NewScanner(rec.Body)
++	for sc.Scan() {
++		line := sc.Text()
++		if name, ok := strings.CutPrefix(line, "event: "); ok {
++			events = append(events, name)
++			continue
++		}
++		data, ok := strings.CutPrefix(line, "data: ")
++		if !ok {
++			continue
++		}
++		var ev struct {
++			Type  string `json:"type"`
++			Delta struct {
++				Type        string `json:"type"`
++				PartialJSON string `json:"partial_json"`
++				StopReason  string `json:"stop_reason"`
++			} `json:"delta"`
++		}
++		if err := json.Unmarshal([]byte(data), &ev); err != nil {
++			t.Fatalf("event data is not JSON: %v: %s", err, data)
++		}
++		if ev.Type != events[len(events)-1] {
++			t.Errorf("data type %q does not match event %q", ev.Type, events[len(events)-1])
++		}
++		if ev.Delta.Type == "input_json_delta" {
++			partial += ev.Delta.PartialJSON
++		}
++		if ev.Type == "message_delta" {
++			stop = ev.Delta.StopReason
++		}
++	}
++	want := "message_start content_block_start content_block_delta content_block_stop " +
++		"message_delta message_stop"
++	if got := strings.Join(events, " "); got != want {
++		t.Errorf("events %q, want %q", got, want)
++	}
++	var input map[string]any
++	if err := json.Unmarshal([]byte(partial), &input); err != nil || input["command"] != "echo hi" {
++		t.Errorf("streamed tool input %q does not carry the scripted command (%v)", partial, err)
++	}
++	if stop != "tool_use" {
++		t.Errorf("stop_reason %q, want tool_use", stop)
++	}
++}
++
++func TestUnknownRoutesAre404AndRecorded(t *testing.T) {
++	s := New(script())
++	rec := httptest.NewRecorder()
++	s.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/hello", nil))
++	if rec.Code != http.StatusNotFound {
++		t.Errorf("HEAD /api/hello status %d, want 404", rec.Code)
++	}
++	if ex := s.Exchanges(); len(ex) != 1 || ex[0].Kind != KindUnrouted {
++		t.Errorf("an unrouted request was not recorded: %+v", ex)
++	}
++}
++
++// Listen must serve on loopback only, and the URL it returns must be usable as
++// ANTHROPIC_BASE_URL as is.
++func TestListenServesOnLoopback(t *testing.T) {
++	l, err := Listen(script())
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer l.Close()
++	if !strings.HasPrefix(l.URL, "http://127.0.0.1:") {
++		t.Fatalf("URL %q is not loopback", l.URL)
++	}
++	resp, err := http.Post(l.URL+"/v1/messages", "application/json", strings.NewReader(withTools))
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer resp.Body.Close()
++	b, _ := io.ReadAll(resp.Body)
++	if resp.StatusCode != http.StatusOK || !strings.Contains(string(b), `"Bash"`) {
++		t.Errorf("status %d body %s", resp.StatusCode, b)
++	}
++}
+-- 
+2.53.0
+

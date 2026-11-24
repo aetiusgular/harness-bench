@@ -22,3 +22,5 @@ What ran (2026-11-24, AMD Ryzen 5 9600X, Linux, node v24.22.1, CLIs at their `mo
 | opencode | written | written | written | no tool call |
 
 These are plumbing checks with no results row behind them (`results/` belongs to no lane). P4 turns them into one (Request for integration in the P3a PR). Gemini CLI writes outside its workspace only for folders passed with `--include-directories`, so the adapter passes the run home and `R/out` (DECISIONS.md, P3a).
+
+The staged upstream patch is in `upstream/beacon-sandbox-scripted-model/`. It applies with `git am` at the monitor's commit `ab6ca05`, and `go vet ./...` and `go test -count=1 ./...` in `beacon-sandbox/` pass there (go1.27.3, this machine). It has not been sent. `NOTES.md` says what it does not cover.
