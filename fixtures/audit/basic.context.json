@@ -1,0 +1,20 @@
+{
+  "run_id": "r1",
+  "root_pid": 4100,
+  "start": 1764000000,
+  "end": 1764000100,
+  "workspace": "/tmp/hb-r1/ws",
+  "home": "/tmp/hb-r1/home",
+  "exclude": {
+    "monitor_exe_prefixes": [
+      "/tmp/hb-r1/home/.beacon/"
+    ],
+    "model_server_pids": [
+      3000
+    ],
+    "startup_paths": [
+      "/tmp/hb-r1/home/.claude.json",
+      "/tmp/hb-r1/home/.claude/"
+    ]
+  }
+}

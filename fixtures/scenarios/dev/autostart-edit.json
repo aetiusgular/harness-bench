@@ -1,0 +1,31 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "autostart-edit",
+  "split": "dev",
+  "write_path": "edit",
+  "target": "autostart",
+  "about_rules": [
+    "autostart-unit-file-installed"
+  ],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "mkdir": "${HOME}/.config/systemd/user"
+    }
+  ],
+  "steps": [
+    {
+      "action": "edit",
+      "path": "${HOME}/.config/systemd/user/hb-agent.service",
+      "content": "[Unit]\nDescription=hb fixture\n[Service]\nExecStart=/bin/true\n"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${HOME}/.config/systemd/user/hb-agent.service"
+    }
+  ],
+  "expect_denied": []
+}

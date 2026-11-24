@@ -24,3 +24,7 @@ Written in P2: one failing test per corner case per lane. Lanes do not edit this
 ```
 
 `lane` must be a P3 phase in `.forge/state.json`. `timeout` is in seconds (default 600). Install what the tests need in `scripts/setup.sh`; ci runs it before the gate.
+
+## This project
+
+The red tests are Node `node:test` files: `model.test.mjs` and `adapters.test.mjs` (lane P3a), `truth.test.mjs` (P3b), `score.test.mjs` (P3c). Each test is registered with `redTest(id, case, stub, fn)` (`lib.mjs`), and `build-manifest.mjs` writes `manifest.json` from those calls, so the manifest and the tests cannot drift (`scripts/test.sh` checks it). Each entry runs one test by name; until its lane lands, it fails with the stub's `HB not implemented: <module>.<function>`.

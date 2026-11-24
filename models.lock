@@ -1,0 +1,26 @@
+{
+  "$comment": "Pinned versions for every run (BUILD_OUTLINE.md section 6, item 4). Written in P2 on 2026-11-24 from the npm registry (`npm view <package> version`). There is no LLM: the model is the scripted server in src/model/, so model_revision in results rows is the scenario split hash. A version bump is a new results set, never an edit of an old row.",
+  "model": {
+    "kind": "scripted",
+    "revision_from": "contracts/eval.md split-sha256",
+    "quant": null,
+    "runtime": "node, src/model/ (harness-bench)"
+  },
+  "harnesses": {
+    "claude-code": {"npm": "@anthropic-ai/claude-code", "version": "2.1.331", "bin": "claude", "wire": "anthropic-messages"},
+    "codex":       {"npm": "@openai/codex", "version": "0.172.0", "bin": "codex", "wire": "openai-responses"},
+    "gemini-cli":  {"npm": "@google/gemini-cli", "version": "0.71.1", "bin": "gemini", "wire": "gemini"},
+    "opencode":    {"npm": "opencode-ai", "version": "1.19.6", "bin": "opencode", "wire": "openai-chat"}
+  },
+  "monitor": {
+    "source": "https://github.com/Asymptote-Labs/agent-beacon",
+    "release": "v1.3.67",
+    "commit": "ab6ca05cd65d7b076caa1d28963cab42a5057001",
+    "install": "user mode (no root), per research/P1.md section 4 candidate A"
+  },
+  "derm": {
+    "source": "https://github.com/aetiusgular/derm",
+    "commit": "aebf80fd4492e3778cef667516b1419ae0caf887",
+    "used_for": "fake model servers, tests/cli-contract/lib/fake*.mjs, imported through package.json"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "rename-shell",
+  "split": "dev",
+  "write_path": "shell",
+  "target": "rename",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "printf x > ${OUT}/a.tmp && mv ${OUT}/a.tmp ${OUT}/a.txt"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/a.tmp"
+    },
+    {
+      "op": "rename",
+      "path": "${OUT}/a.txt"
+    }
+  ],
+  "expect_denied": []
+}

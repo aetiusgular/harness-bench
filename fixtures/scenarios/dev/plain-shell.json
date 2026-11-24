@@ -1,0 +1,24 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "plain-shell",
+  "split": "dev",
+  "write_path": "shell",
+  "target": "plain",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "printf '%s' 'hb fixture\n' >> ${OUT}/notes.txt"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/notes.txt"
+    }
+  ],
+  "expect_denied": []
+}

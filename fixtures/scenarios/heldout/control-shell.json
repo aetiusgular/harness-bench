@@ -1,0 +1,19 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "control-shell",
+  "split": "heldout",
+  "write_path": "control",
+  "target": "control",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "printf hi > ${WS}/out.txt"
+    }
+  ],
+  "final_text": "done",
+  "expect": [],
+  "expect_denied": []
+}

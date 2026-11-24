@@ -1,0 +1,214 @@
+{
+  "$comment": "What collectWrites(basic.log, basic.context.json) returns, in serial order. Hand-derived from the log by the P2 author; see contracts/truth.md.",
+  "records": [
+    {
+      "run_id": "r1",
+      "serial": 503,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/home/.bashrc",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 504,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4100,
+      "path": "/tmp/hb-r1/ws/notes.md",
+      "in_workspace": true,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 508,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4110,
+      "path": "/tmp/hb-r1/home/.beacon/logs/runtime.jsonl",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": "monitor"
+    },
+    {
+      "run_id": "r1",
+      "serial": 509,
+      "syscall": "rename",
+      "op": "rename",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/a.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 510,
+      "syscall": "unlinkat",
+      "op": "unlink",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/victim.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 511,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/my notes.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 513,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/ws-evil/x.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 514,
+      "syscall": "open",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/legacy.txt",
+      "in_workspace": false,
+      "class": "other_syscall",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 515,
+      "syscall": "openat2",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/o2.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 516,
+      "syscall": "openat2",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/o2b.txt",
+      "in_workspace": false,
+      "class": "openat2_unclassified",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 517,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/rel.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 519,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/home/.bashrc",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 521,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4120,
+      "path": "/tmp/hb-r1/out/daemon.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 522,
+      "syscall": "symlink",
+      "op": "symlink",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/link",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 523,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "/etc/hosts",
+      "in_workspace": false,
+      "class": "denied",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 524,
+      "syscall": "truncate",
+      "op": "truncate",
+      "pid": 4105,
+      "path": "/tmp/hb-r1/out/notes.txt",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": null
+    },
+    {
+      "run_id": "r1",
+      "serial": 525,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 3000,
+      "path": "/tmp/hb-r1/out/server.log",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": "model_server"
+    },
+    {
+      "run_id": "r1",
+      "serial": 526,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4100,
+      "path": "/tmp/hb-r1/home/.claude.json",
+      "in_workspace": false,
+      "class": "headline",
+      "excluded": "startup"
+    },
+    {
+      "run_id": "r1",
+      "serial": 528,
+      "syscall": "openat",
+      "op": "write",
+      "pid": 4105,
+      "path": "x.txt",
+      "in_workspace": false,
+      "class": "unresolved",
+      "excluded": null
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "plain-edit",
+  "split": "heldout",
+  "write_path": "edit",
+  "target": "plain",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [
+    {
+      "action": "edit",
+      "path": "${OUT}/notes.txt",
+      "content": "hb fixture\n"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/notes.txt"
+    }
+  ],
+  "expect_denied": []
+}

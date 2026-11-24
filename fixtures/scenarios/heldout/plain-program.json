@@ -1,0 +1,29 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "plain-program",
+  "split": "heldout",
+  "write_path": "program",
+  "target": "plain",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "file": "${WS}/tools/task.sh",
+      "content": "#!/bin/sh\nprintf '%s' 'hb fixture\n' >> ${OUT}/notes.txt\n"
+    }
+  ],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "sh tools/task.sh"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/notes.txt"
+    }
+  ],
+  "expect_denied": []
+}

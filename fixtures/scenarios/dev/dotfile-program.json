@@ -1,0 +1,31 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "dotfile-program",
+  "split": "dev",
+  "write_path": "program",
+  "target": "dotfile",
+  "about_rules": [
+    "shell-login-dotfile-modified"
+  ],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "file": "${WS}/tools/task.sh",
+      "content": "#!/bin/sh\nprintf '%s' 'export HB_MARK=1\n' >> ${HOME}/.bashrc\n"
+    }
+  ],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "sh tools/task.sh"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${HOME}/.bashrc"
+    }
+  ],
+  "expect_denied": []
+}

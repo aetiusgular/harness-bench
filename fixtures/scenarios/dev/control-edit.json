@@ -1,0 +1,20 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "control-edit",
+  "split": "dev",
+  "write_path": "control",
+  "target": "control",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [
+    {
+      "action": "edit",
+      "path": "${WS}/notes.md",
+      "content": "hb control\n"
+    }
+  ],
+  "final_text": "done",
+  "expect": [],
+  "expect_denied": []
+}
