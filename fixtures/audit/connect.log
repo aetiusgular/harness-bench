@@ -1,0 +1,53 @@
+type=SYSCALL msg=audit(1763999990.000:700): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1763999990.000:700): saddr=020001BBC000020A0000000000000000
+type=PROCTITLE msg=audit(1763999990.000:700): proctitle=6E6F6465
+type=EOE msg=audit(1763999990.000:700):
+type=SYSCALL msg=audit(1764000000.200:701): arch=c000003e syscall=56 success=yes exit=4120 a0=1200011 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_proc"
+type=PROCTITLE msg=audit(1764000000.200:701): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.200:701):
+type=SYSCALL msg=audit(1764000000.203:702): arch=c000003e syscall=56 success=yes exit=4130 a0=1200011 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_proc"
+type=PROCTITLE msg=audit(1764000000.203:702): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.203:702):
+type=SOCKADDR msg=audit(1764000000.206:703): saddr=020001BBC000020A0000000000000000
+type=SYSCALL msg=audit(1764000000.206:703): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=PROCTITLE msg=audit(1764000000.206:703): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.206:703):
+type=SYSCALL msg=audit(1764000000.209:704): arch=c000003e syscall=42 success=no exit=-115 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4100 pid=4120 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="curl" exe="/usr/bin/curl" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.209:704): saddr=02000050CB0071070000000000000000
+type=PROCTITLE msg=audit(1764000000.209:704): proctitle=6375726C
+type=EOE msg=audit(1764000000.209:704):
+type=SYSCALL msg=audit(1764000000.212:705): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4100 pid=4120 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="curl" exe="/usr/bin/curl" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.212:705): saddr=0A0001BB0000000020010DB800000000000000000000000500000000
+type=PROCTITLE msg=audit(1764000000.212:705): proctitle=6375726C
+type=EOE msg=audit(1764000000.212:705):
+type=SYSCALL msg=audit(1764000000.215:706): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.215:706): saddr=0200B26E7F0000010000000000000000
+type=PROCTITLE msg=audit(1764000000.215:706): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.215:706):
+type=SYSCALL msg=audit(1764000000.218:707): arch=c000003e syscall=42 success=no exit=-2 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4100 pid=4120 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="curl" exe="/usr/bin/curl" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.218:707): saddr=01002F72756E2F6E7363642F736F636B657400
+type=PROCTITLE msg=audit(1764000000.218:707): proctitle=6375726C
+type=EOE msg=audit(1764000000.218:707):
+type=SYSCALL msg=audit(1764000000.221:708): arch=c000003e syscall=42 success=no exit=-111 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4100 pid=4120 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="curl" exe="/usr/bin/curl" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.221:708): saddr=020001BBC63364090000000000000000
+type=PROCTITLE msg=audit(1764000000.221:708): proctitle=6375726C
+type=EOE msg=audit(1764000000.221:708):
+type=SYSCALL msg=audit(1764000000.224:709): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=1 pid=999 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="cron" exe="/usr/sbin/cron" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.224:709): saddr=020001BBC000020A0000000000000000
+type=PROCTITLE msg=audit(1764000000.224:709): proctitle=63726F6E
+type=EOE msg=audit(1764000000.224:709):
+type=SYSCALL msg=audit(1764000000.227:710): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.227:710): saddr=020001BBC000020A0000000000000000
+type=PROCTITLE msg=audit(1764000000.227:710): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.227:710):
+type=SYSCALL msg=audit(1764000000.230:711): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=4100 pid=4130 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="beacon-hooks" exe="/tmp/hb-r1/home/.beacon/bin/beacon-hooks" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.230:711): saddr=020010DE7F0000010000000000000000
+type=PROCTITLE msg=audit(1764000000.230:711): proctitle=626561636F6E2D686F6F6B73
+type=EOE msg=audit(1764000000.230:711):
+type=SYSCALL msg=audit(1764000000.233:712): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=10 a3=1b6 items=0 ppid=2990 pid=3000 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=SOCKADDR msg=audit(1764000000.233:712): saddr=020000097F0000010000000000000000
+type=PROCTITLE msg=audit(1764000000.233:712): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.233:712):
+type=SYSCALL msg=audit(1764000000.236:713): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=PROCTITLE msg=audit(1764000000.236:713): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.236:713):

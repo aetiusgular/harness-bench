@@ -1,0 +1,13 @@
+{
+  "$comment": "What collectConnects(connect.log, basic.context.json) returns, in serial order (contracts/truth.md, Connect records). Hand-derived. Not returned: 700 (before start), 701 and 702 (clones), 707 (AF_UNIX), 709 (pid 999 outside the tree), 713 (no SOCKADDR record). 704 is EINPROGRESS (exit -115), so it is an attempt, class egress. 703 has its SOCKADDR record before its SYSCALL record.",
+  "records": [
+    {"run_id": "r1", "serial": 703, "pid": 4100, "family": "inet", "address": "192.0.2.10", "port": 443, "class": "egress", "excluded": null},
+    {"run_id": "r1", "serial": 704, "pid": 4120, "family": "inet", "address": "203.0.113.7", "port": 80, "class": "egress", "excluded": null},
+    {"run_id": "r1", "serial": 705, "pid": 4120, "family": "inet6", "address": "2001:db8::5", "port": 443, "class": "egress", "excluded": null},
+    {"run_id": "r1", "serial": 706, "pid": 4100, "family": "inet", "address": "127.0.0.1", "port": 45678, "class": "loopback", "excluded": null},
+    {"run_id": "r1", "serial": 708, "pid": 4120, "family": "inet", "address": "198.51.100.9", "port": 443, "class": "failed", "excluded": null},
+    {"run_id": "r1", "serial": 710, "pid": 4100, "family": "inet", "address": "192.0.2.10", "port": 443, "class": "egress", "excluded": null},
+    {"run_id": "r1", "serial": 711, "pid": 4130, "family": "inet", "address": "127.0.0.1", "port": 4318, "class": "loopback", "excluded": "monitor"},
+    {"run_id": "r1", "serial": 712, "pid": 3000, "family": "inet", "address": "127.0.0.1", "port": 9, "class": "loopback", "excluded": "model_server"}
+  ]
+}

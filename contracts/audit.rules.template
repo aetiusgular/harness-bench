@@ -1,0 +1,15 @@
+## harness-bench ground-truth rules (contracts/truth.md). x86_64 only.
+## @UID@ is the uid of the account the harness runs as. Install with
+##   sed "s/@UID@/$(id -u <run-user>)/g" contracts/audit.rules.template > /etc/audit/rules.d/60-harness-bench.rules && augenrules --load
+## Write syscalls are recorded whether or not they succeed: the collector puts failures in the denied column.
+## openat is filtered on its flags (a2) and open on its flags (a1): O_WRONLY|O_RDWR|O_CREAT|O_TRUNC = 0x243.
+-a always,exit -F arch=b64 -S openat -F a2&0x243 -F euid=@UID@ -k hb_write
+-a always,exit -F arch=b64 -S open -F a1&0x243 -F euid=@UID@ -k hb_write
+## openat2 passes its flags in a struct, so the kernel filter cannot see them; the collector classifies by PATH nametype.
+-a always,exit -F arch=b64 -S openat2 -F euid=@UID@ -k hb_write
+-a always,exit -F arch=b64 -S creat,truncate,rename,renameat,renameat2,unlink,unlinkat,link,linkat,symlink,symlinkat -F euid=@UID@ -k hb_write
+## Process tree: every exec, and every fork or clone that succeeded (the parent's record carries the child pid in exit=).
+-a always,exit -F arch=b64 -S execve,execveat -F euid=@UID@ -k hb_exec
+-a always,exit -F arch=b64 -S clone,clone3,fork,vfork -F success=1 -F euid=@UID@ -k hb_proc
+## Egress table (SPEC.md secondary table 3).
+-a always,exit -F arch=b64 -S connect -F euid=@UID@ -k hb_net

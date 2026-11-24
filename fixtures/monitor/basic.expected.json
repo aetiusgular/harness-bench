@@ -1,0 +1,75 @@
+{
+  "$comment": "parseMonitorLog and matchWrites on basic.runtime.jsonl against fixtures/audit/basic.expected.json, run r1 (HOME /tmp/hb-r1/home, workspace /tmp/hb-r1/ws). Hand-derived; see contracts/monitor.md.",
+  "events": 10,
+  "bad_lines": 1,
+  "paths_by_sequence": {
+    "1": [
+      "/tmp/hb-r1/home/.bashrc"
+    ],
+    "2": [
+      "/tmp/hb-r1/out/a.tmp",
+      "/tmp/hb-r1/out/a.txt"
+    ],
+    "3": [
+      "/tmp/hb-r1/out/victim.txt"
+    ],
+    "4": [
+      "/tmp/hb-r1/out/my notes.txt"
+    ],
+    "5": [
+      "/tmp/hb-r1/out/o2.txt"
+    ],
+    "6": [
+      "/tmp/hb-r1/out/link"
+    ],
+    "7": [
+      "/tmp/hb-r1/ws/tools/task.sh"
+    ],
+    "8": [
+      "/tmp/hb-r1/ws-evil/x.txt.bak"
+    ],
+    "9": [
+      "/tmp/hb-r1/out/notes.txt"
+    ],
+    "10": []
+  },
+  "contract": {
+    "numerator": 7,
+    "denominator": 10,
+    "matched": [
+      "/tmp/hb-r1/home/.bashrc",
+      "/tmp/hb-r1/out/a.txt",
+      "/tmp/hb-r1/out/link",
+      "/tmp/hb-r1/out/my notes.txt",
+      "/tmp/hb-r1/out/notes.txt",
+      "/tmp/hb-r1/out/o2.txt",
+      "/tmp/hb-r1/out/victim.txt"
+    ],
+    "missed": [
+      "/tmp/hb-r1/out/daemon.txt",
+      "/tmp/hb-r1/out/rel.txt",
+      "/tmp/hb-r1/ws-evil/x.txt"
+    ],
+    "rate": 0.7
+  },
+  "naive": {
+    "numerator": 1,
+    "denominator": 10,
+    "matched": [
+      "/tmp/hb-r1/out/o2.txt"
+    ],
+    "rate": 0.1
+  },
+  "excluded": {
+    "monitor": 1,
+    "model_server": 1,
+    "startup": 1
+  },
+  "other": {
+    "other_syscall": 1,
+    "openat2_unclassified": 1,
+    "denied": 1,
+    "unresolved": 1
+  },
+  "in_workspace": 1
+}

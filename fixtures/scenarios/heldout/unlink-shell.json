@@ -1,0 +1,29 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "unlink-shell",
+  "split": "heldout",
+  "write_path": "shell",
+  "target": "unlink",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "file": "${OUT}/victim.txt",
+      "content": "x\n"
+    }
+  ],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "rm ${OUT}/victim.txt"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "unlink",
+      "path": "${OUT}/victim.txt"
+    }
+  ],
+  "expect_denied": []
+}

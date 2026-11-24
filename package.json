@@ -1,0 +1,17 @@
+{
+  "name": "harness-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Per-harness capture rate of a hook-based agent monitor against the kernel's audit record.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "bash scripts/test.sh"
+  },
+  "dependencies": {
+    "derm-workspace": "git+https://github.com/aetiusgular/derm.git#aebf80fd4492e3778cef667516b1419ae0caf887"
+  }
+}

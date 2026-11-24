@@ -1,0 +1,11 @@
+{
+  "$comment": "matchEgress(fixtures/audit/connect.expected.json records, the parsed lines of connect.runtime.jsonl), run r1 (contracts/monitor.md, The egress join). Hand-derived. 192.0.2.10:443 is connected twice and counts once; no event names it (sequence 5's word 192.0.2.100 is a different address and not a URL or host:port). Sequence 1 names 203.0.113.7 through a URL with no port; sequence 2 names 2001:db8::5 through server.address. Sequence 4 names 198.51.100.9, but that connect failed, so it is in failed, not in connects. example.invalid is a hostname: counted in hostnames, never matched.",
+  "connects": 3,
+  "named": 2,
+  "matched": ["203.0.113.7:80", "[2001:db8::5]:443"],
+  "missed": ["192.0.2.10:443"],
+  "loopback": 1,
+  "failed": 1,
+  "excluded": {"monitor": 1, "model_server": 1},
+  "hostnames": ["example.invalid"]
+}

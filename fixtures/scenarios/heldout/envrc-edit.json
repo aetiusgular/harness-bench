@@ -1,0 +1,31 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "envrc-edit",
+  "split": "heldout",
+  "write_path": "edit",
+  "target": "envrc",
+  "about_rules": [
+    "direnv-envrc-modified"
+  ],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "mkdir": "${OUT}/project"
+    }
+  ],
+  "steps": [
+    {
+      "action": "edit",
+      "path": "${OUT}/project/.envrc",
+      "content": "export HB_MARK=1\n"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/project/.envrc"
+    }
+  ],
+  "expect_denied": []
+}

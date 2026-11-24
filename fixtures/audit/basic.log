@@ -1,0 +1,152 @@
+type=SYSCALL msg=audit(1763999990.000:400): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1763999990.000:400): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1763999990.000:400): item=0 name="/tmp/hb-r1/out/stale.txt" inode=4000 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=EOE msg=audit(1763999990.000:400):
+type=SYSCALL msg=audit(1764000000.103:501): arch=c000003e syscall=56 success=yes exit=4105 a0=1200011 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_proc"
+type=CWD msg=audit(1764000000.103:501): cwd="/tmp/hb-r1/ws"
+type=PROCTITLE msg=audit(1764000000.103:501): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.103:501):
+type=SYSCALL msg=audit(1764000000.106:502): arch=c000003e syscall=59 success=yes exit=0 a0=ffffff9c a1=7ffd0000 a2=0 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_exec"
+type=EXECVE msg=audit(1764000000.106:502): argc=3 a0="bash" a1="-c" a2="printf x >> ~/.bashrc"
+type=CWD msg=audit(1764000000.106:502): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.106:502): item=0 name="/usr/bin/bash" inode=6020 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.106:502): proctitle=62617368
+type=EOE msg=audit(1764000000.106:502):
+type=SYSCALL msg=audit(1764000000.109:503): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.109:503): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.109:503): item=0 name="/tmp/hb-r1/home/" inode=6030 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.109:503): item=1 name="/tmp/hb-r1/home/.bashrc" inode=6031 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.109:503): proctitle=62617368
+type=EOE msg=audit(1764000000.109:503):
+type=SYSCALL msg=audit(1764000000.112:504): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=241 a3=1b6 items=1 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.112:504): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.112:504): item=0 name="notes.md" inode=6040 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.112:504): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.112:504):
+type=SYSCALL msg=audit(1764000000.115:505): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=1 pid=999 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="cron" exe="/usr/sbin/cron" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.115:505): cwd="/"
+type=PATH msg=audit(1764000000.115:505): item=0 name="/tmp/hb-r1/out/unrelated.txt" inode=6050 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.115:505): proctitle=63726F6E
+type=EOE msg=audit(1764000000.115:505):
+type=SYSCALL msg=audit(1764000000.118:506): arch=c000003e syscall=56 success=yes exit=4110 a0=1200011 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_proc"
+type=CWD msg=audit(1764000000.118:506): cwd="/tmp/hb-r1/ws"
+type=PROCTITLE msg=audit(1764000000.118:506): proctitle=62617368
+type=EOE msg=audit(1764000000.118:506):
+type=SYSCALL msg=audit(1764000000.121:507): arch=c000003e syscall=59 success=yes exit=0 a0=ffffff9c a1=7ffd0000 a2=0 a3=1b6 items=1 ppid=4105 pid=4110 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="beacon-hooks" exe="/tmp/hb-r1/home/.beacon/bin/beacon-hooks" subj=unconfined key="hb_exec"
+type=EXECVE msg=audit(1764000000.121:507): argc=2 a0="beacon-hooks" a1="claude"
+type=CWD msg=audit(1764000000.121:507): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.121:507): item=0 name="/tmp/hb-r1/home/.beacon/bin/beacon-hooks" inode=6070 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.121:507): proctitle=626561636F6E2D686F6F6B73
+type=EOE msg=audit(1764000000.121:507):
+type=SYSCALL msg=audit(1764000000.124:508): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4105 pid=4110 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="beacon-hooks" exe="/tmp/hb-r1/home/.beacon/bin/beacon-hooks" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.124:508): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.124:508): item=0 name="/tmp/hb-r1/home/.beacon/logs/runtime.jsonl" inode=6080 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.124:508): proctitle=626561636F6E2D686F6F6B73
+type=EOE msg=audit(1764000000.124:508):
+type=SYSCALL msg=audit(1764000000.127:509): arch=c000003e syscall=82 success=yes exit=0 a0=7ffd1000 a1=7ffd0000 a2=0 a3=1b6 items=4 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.127:509): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.127:509): item=0 name="/tmp/hb-r1/out/" inode=6090 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.127:509): item=1 name="/tmp/hb-r1/out/" inode=6091 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.127:509): item=2 name="/tmp/hb-r1/out/a.tmp" inode=6092 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=DELETE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.127:509): item=3 name="/tmp/hb-r1/out/a.txt" inode=6093 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.127:509): proctitle=62617368
+type=EOE msg=audit(1764000000.127:509):
+type=SYSCALL msg=audit(1764000000.130:510): arch=c000003e syscall=263 success=yes exit=0 a0=ffffff9c a1=7ffd0000 a2=0 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.130:510): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.130:510): item=0 name="/tmp/hb-r1/out/" inode=6100 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.130:510): item=1 name="/tmp/hb-r1/out/victim.txt" inode=6101 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=DELETE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.130:510): proctitle=62617368
+type=EOE msg=audit(1764000000.130:510):
+type=SYSCALL msg=audit(1764000000.133:511): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.133:511): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.133:511): item=0 name="/tmp/hb-r1/out/" inode=6110 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.133:511): item=1 name=2F746D702F68622D72312F6F75742F6D79206E6F7465732E747874 inode=6111 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.133:511): proctitle=62617368
+type=EOE msg=audit(1764000000.133:511):
+type=SYSCALL msg=audit(1764000000.136:512): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=0 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.136:512): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.136:512): item=0 name="/tmp/hb-r1/home/.profile" inode=6120 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.136:512): proctitle=62617368
+type=EOE msg=audit(1764000000.136:512):
+type=SYSCALL msg=audit(1764000000.139:513): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.139:513): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.139:513): item=0 name="/tmp/hb-r1/ws-evil/x.txt" inode=6130 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.139:513): proctitle=62617368
+type=EOE msg=audit(1764000000.139:513):
+type=SYSCALL msg=audit(1764000000.142:514): arch=c000003e syscall=2 success=yes exit=3 a0=7ffd2000 a1=441 a2=1b6 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.142:514): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.142:514): item=0 name="/tmp/hb-r1/out/legacy.txt" inode=6140 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.142:514): proctitle=62617368
+type=EOE msg=audit(1764000000.142:514):
+type=SYSCALL msg=audit(1764000000.145:515): arch=c000003e syscall=437 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=7ffd3000 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.145:515): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.145:515): item=0 name="/tmp/hb-r1/out/" inode=6150 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.145:515): item=1 name="/tmp/hb-r1/out/o2.txt" inode=6151 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.145:515): proctitle=62617368
+type=EOE msg=audit(1764000000.145:515):
+type=SYSCALL msg=audit(1764000000.148:516): arch=c000003e syscall=437 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=7ffd3000 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.148:516): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.148:516): item=0 name="/tmp/hb-r1/out/o2b.txt" inode=6160 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.148:516): proctitle=62617368
+type=EOE msg=audit(1764000000.148:516):
+type=SYSCALL msg=audit(1764000000.151:517): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=SYSCALL msg=audit(1764000000.154:518): arch=c000003e syscall=59 success=yes exit=0 a0=ffffff9c a1=7ffd0000 a2=0 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_exec"
+type=CWD msg=audit(1764000000.151:517): cwd="/tmp/hb-r1/ws"
+type=EXECVE msg=audit(1764000000.154:518): argc=1 a0="true"
+type=PATH msg=audit(1764000000.151:517): item=0 name="../out/rel.txt" inode=6170 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(1764000000.154:518): cwd="/tmp/hb-r1/ws"
+type=PROCTITLE msg=audit(1764000000.151:517): proctitle=62617368
+type=PATH msg=audit(1764000000.154:518): item=0 name="/usr/bin/true" inode=6180 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=EOE msg=audit(1764000000.151:517):
+type=PROCTITLE msg=audit(1764000000.154:518): proctitle=62617368
+type=EOE msg=audit(1764000000.154:518):
+type=SYSCALL msg=audit(1764000000.157:519): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.157:519): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.157:519): item=0 name="/tmp/hb-r1/home/.bashrc" inode=6190 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.157:519): proctitle=62617368
+type=EOE msg=audit(1764000000.157:519):
+type=SYSCALL msg=audit(1764000000.160:520): arch=c000003e syscall=56 success=yes exit=4120 a0=1200011 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_proc"
+type=CWD msg=audit(1764000000.160:520): cwd="/tmp/hb-r1/ws"
+type=PROCTITLE msg=audit(1764000000.160:520): proctitle=62617368
+type=EOE msg=audit(1764000000.160:520):
+type=SYSCALL msg=audit(1764000000.163:521): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=1 pid=4120 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="sh" exe="/usr/bin/dash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.163:521): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.163:521): item=0 name="/tmp/hb-r1/out/daemon.txt" inode=6210 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.163:521): proctitle=7368
+type=EOE msg=audit(1764000000.163:521):
+type=SYSCALL msg=audit(1764000000.166:522): arch=c000003e syscall=88 success=yes exit=0 a0=7ffd4000 a1=7ffd5000 a2=0 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.166:522): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.166:522): item=0 name="/tmp/hb-r1/out/" inode=6220 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.166:522): item=1 name="/tmp/hb-r1/out/link" inode=6221 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.166:522): proctitle=62617368
+type=EOE msg=audit(1764000000.166:522):
+type=SYSCALL msg=audit(1764000000.169:523): arch=c000003e syscall=257 success=no exit=-13 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.169:523): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.169:523): item=0 name="/etc/" inode=6230 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1764000000.169:523): item=1 name="/etc/hosts" inode=6231 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.169:523): proctitle=62617368
+type=EOE msg=audit(1764000000.169:523):
+type=SYSCALL msg=audit(1764000000.172:524): arch=c000003e syscall=76 success=yes exit=0 a0=7ffd6000 a1=0 a2=0 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.172:524): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.172:524): item=0 name="/tmp/hb-r1/out/notes.txt" inode=6240 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.172:524): proctitle=62617368
+type=EOE msg=audit(1764000000.172:524):
+type=SYSCALL msg=audit(1764000000.175:525): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=2990 pid=3000 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.175:525): cwd="/tmp/hb-r1"
+type=PATH msg=audit(1764000000.175:525): item=0 name="/tmp/hb-r1/out/server.log" inode=6250 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.175:525): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.175:525):
+type=SYSCALL msg=audit(1764000000.178:526): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=241 a3=1b6 items=1 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.178:526): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.178:526): item=0 name="/tmp/hb-r1/home/.claude.json" inode=6260 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.178:526): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.178:526):
+type=SYSCALL msg=audit(1764000000.181:527): arch=c000003e syscall=42 success=yes exit=0 a0=15 a1=7ffd0000 a2=0 a3=1b6 items=0 ppid=4000 pid=4100 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="node" exe="/usr/bin/node" subj=unconfined key="hb_net"
+type=CWD msg=audit(1764000000.181:527): cwd="/tmp/hb-r1/ws"
+type=PROCTITLE msg=audit(1764000000.181:527): proctitle=6E6F6465
+type=EOE msg=audit(1764000000.181:527):
+type=SYSCALL msg=audit(1764000000.300:528): arch=c000003e syscall=257 success=yes exit=4 a0=3 a1=7ffd0000 a2=441 a3=1b6 items=1 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"
+type=CWD msg=audit(1764000000.300:528): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.300:528): item=0 name="x.txt" inode=9000 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PROCTITLE msg=audit(1764000000.300:528): proctitle=62617368
+type=EOE msg=audit(1764000000.300:528):

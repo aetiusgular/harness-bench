@@ -1,0 +1,6 @@
+{
+  "$comment": "What collectWrites(enriched.log, basic.context.json) returns. The ENRICHED log format appends interpreted fields after a 0x1d byte; the record is the same write as in RAW format.",
+  "records": [
+    {"run_id": "r1", "serial": 601, "syscall": "openat", "op": "write", "pid": 4105, "path": "/tmp/hb-r1/out/enriched.txt", "in_workspace": false, "class": "headline", "excluded": null}
+  ]
+}

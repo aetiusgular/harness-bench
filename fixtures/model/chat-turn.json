@@ -1,0 +1,5 @@
+{"model": "fake-model", "stream": true,
+ "messages": [{"role": "system", "content": "You are an agent. (hand-written fixture)"}, {"role": "user", "content": "Do the scripted task."}],
+ "tools": [{"type": "function", "function": {"name": "bash", "parameters": {"type": "object", "properties": {"command": {"type": "string"}, "description": {"type": "string"}}, "required": ["command"]}}},
+           {"type": "function", "function": {"name": "write", "parameters": {"type": "object", "properties": {"filePath": {"type": "string"}, "content": {"type": "string"}}, "required": ["filePath", "content"]}}},
+           {"type": "function", "function": {"name": "read", "parameters": {"type": "object", "properties": {"filePath": {"type": "string"}}}}}]}

@@ -1,0 +1,53 @@
+[
+  {
+    "rule_id": "shell-login-dotfile-modified",
+    "title": "Shell login dotfile modified",
+    "severity": "high",
+    "posture": "detect",
+    "session_id": "s-r1",
+    "reason": "fixture",
+    "events": [
+      {
+        "timestamp": "2026-11-24T10:00:00.000000000Z",
+        "sequence": 1,
+        "vendor": "beacon",
+        "product": "endpoint-agent",
+        "schema_version": "1.0",
+        "event": {
+          "kind": "agent_runtime",
+          "action": "file.modified",
+          "category": "file"
+        },
+        "severity": "info",
+        "endpoint": {
+          "hostname": "hb-fixture",
+          "os": "linux"
+        },
+        "harness": {
+          "name": "claude_code",
+          "collection_method": "hook"
+        },
+        "session": {
+          "id": "s-r1",
+          "working_directory": "/tmp/hb-r1/ws"
+        },
+        "file": {
+          "path": "~/.bashrc",
+          "operation": "write"
+        },
+        "tool": {
+          "name": "Write"
+        }
+      }
+    ]
+  },
+  {
+    "rule_id": "etc-hosts-modified",
+    "title": "/etc/hosts or hosts.allow/deny modified",
+    "severity": "high",
+    "posture": "detect",
+    "session_id": "s-r2",
+    "reason": "fixture",
+    "events": []
+  }
+]

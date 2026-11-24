@@ -1,0 +1,33 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "unlink-program",
+  "split": "dev",
+  "write_path": "program",
+  "target": "unlink",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "file": "${OUT}/victim.txt",
+      "content": "x\n"
+    },
+    {
+      "file": "${WS}/tools/task.sh",
+      "content": "#!/bin/sh\nrm ${OUT}/victim.txt\n"
+    }
+  ],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "sh tools/task.sh"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "unlink",
+      "path": "${OUT}/victim.txt"
+    }
+  ],
+  "expect_denied": []
+}

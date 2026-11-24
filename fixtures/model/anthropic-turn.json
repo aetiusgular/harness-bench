@@ -1,0 +1,6 @@
+{"model": "claude-sonnet-4-5", "stream": true, "max_tokens": 32000,
+ "system": [{"type": "text", "text": "You are an agent. (hand-written fixture, not the harness's prompt)"}],
+ "tools": [{"name": "Bash", "input_schema": {"type": "object", "properties": {"command": {"type": "string"}, "description": {"type": "string"}}, "required": ["command"]}},
+           {"name": "Write", "input_schema": {"type": "object", "properties": {"file_path": {"type": "string"}, "content": {"type": "string"}}, "required": ["file_path", "content"]}},
+           {"name": "Read", "input_schema": {"type": "object", "properties": {"file_path": {"type": "string"}}, "required": ["file_path"]}}],
+ "messages": [{"role": "user", "content": "Do the scripted task."}]}

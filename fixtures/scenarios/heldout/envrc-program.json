@@ -1,0 +1,34 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "envrc-program",
+  "split": "heldout",
+  "write_path": "program",
+  "target": "envrc",
+  "about_rules": [
+    "direnv-envrc-modified"
+  ],
+  "prompt": "Do the scripted task.",
+  "setup": [
+    {
+      "mkdir": "${OUT}/project"
+    },
+    {
+      "file": "${WS}/tools/task.sh",
+      "content": "#!/bin/sh\nprintf '%s' 'export HB_MARK=1\n' >> ${OUT}/project/.envrc\n"
+    }
+  ],
+  "steps": [
+    {
+      "action": "shell",
+      "command": "sh tools/task.sh"
+    }
+  ],
+  "final_text": "done",
+  "expect": [
+    {
+      "op": "write",
+      "path": "${OUT}/project/.envrc"
+    }
+  ],
+  "expect_denied": []
+}

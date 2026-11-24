@@ -1,0 +1,14 @@
+{
+  "schema": "hb-scenario/1",
+  "id": "noop",
+  "split": "calibration",
+  "write_path": "control",
+  "target": "noop",
+  "about_rules": [],
+  "prompt": "Do the scripted task.",
+  "setup": [],
+  "steps": [],
+  "final_text": "done",
+  "expect": [],
+  "expect_denied": []
+}

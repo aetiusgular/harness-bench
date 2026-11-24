@@ -1,0 +1,6 @@
+type=SYSCALL msg=audit(1764000000.200:601): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffd0000 a2=441 a3=1b6 items=2 ppid=4100 pid=4105 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts1 ses=3 comm="bash" exe="/usr/bin/bash" subj=unconfined key="hb_write"ARCH=x86_64 SYSCALL=openat AUID="opone" UID="opone" GID="opone" EUID="opone" SUID="opone" FSUID="opone" EGID="opone" SGID="opone" FSGID="opone"
+type=CWD msg=audit(1764000000.200:601): cwd="/tmp/hb-r1/ws"
+type=PATH msg=audit(1764000000.200:601): item=0 name="/tmp/hb-r1/out/" inode=7000 dev=08:02 mode=040755 ouid=1000 ogid=1000 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0OUID="opone" OGID="opone"
+type=PATH msg=audit(1764000000.200:601): item=1 name="/tmp/hb-r1/out/enriched.txt" inode=7001 dev=08:02 mode=0100644 ouid=1000 ogid=1000 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0OUID="opone" OGID="opone"
+type=PROCTITLE msg=audit(1764000000.200:601): proctitle=62617368
+type=EOE msg=audit(1764000000.200:601):
