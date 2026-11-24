@@ -24,3 +24,15 @@ What ran (2026-11-24, AMD Ryzen 5 9600X, Linux, node v24.22.1, CLIs at their `mo
 These are plumbing checks with no results row behind them (`results/` belongs to no lane). P4 turns them into one (Request for integration in the P3a PR). Gemini CLI writes outside its workspace only for folders passed with `--include-directories`, so the adapter passes the run home and `R/out` (DECISIONS.md, P3a).
 
 The staged upstream patch is in `upstream/beacon-sandbox-scripted-model/`. It applies with `git am` at the monitor's commit `ab6ca05`, and `go vet ./...` and `go test -count=1 ./...` in `beacon-sandbox/` pass there (go1.27.3, this machine). It has not been sent. `NOTES.md` says what it does not cover.
+
+## Lane P3b: ground-truth collector
+
+`src/truth/` reads the kernel's record of a run (`contracts/truth.md`). `renderRules` fills the run user's uid into `contracts/audit.rules.template` and refuses root. `parseAuditLog` groups auditd's RAW or ENRICHED records into events and decodes hex-encoded names, cwd, exe and EXECVE arguments, including long arguments split into chunks. `collectWrites` follows the harness's process tree in time order, through clone records and reparenting to pid 1. It keeps the write syscalls from the contract's table, resolves relative names against the cwd when the name's own dirfd argument is `AT_FDCWD`, and sorts each record into its class (`headline`, `other_syscall`, `openat2_unclassified`, `denied`, `unresolved`) and its exclusion (monitor, model server, startup). `collectConnects` decodes AF_INET and AF_INET6 `SOCKADDR` (RFC 5952 text for v6) and classes each connect as `egress`, `loopback` or `failed`.
+
+What ran (2026-11-24, AMD Ryzen 5 9600X, Linux 7.0.0-43-generic, node v24.22.1):
+
+- `bash scripts/test.sh`: the contract tests, `tests/model/*.test.mjs` and `tests/truth/collect.test.mjs` pass. The truth tests cover corners the fixtures do not: a `node=` prefix, hex cwd and exe, chunked EXECVE arguments, the new-name dirfd of `renameat2` and `symlinkat`, a sign-extended `AT_FDCWD`, the inclusive time window, startup folder and file entries, and RFC 5952 edge cases.
+- `scripts/forge-gate.sh P3b`: the P3a and P3b red tests are green, and the P3c red tests still fail for their stated reason.
+- The parser was also run over this machine's own `/var/log/audit/audit.log` as a format check, printing counts only. Every line was read as a record, and every `SYSCALL` record had a pid. Some `unlinkat` calls (Python's tree removal, and one harness's own process) used a real directory fd, so they came back `unresolved` (Request for integration in the P3b PR). No rows from that log are kept anywhere.
+
+The rule file has still not been loaded on a kernel (`contracts/truth.md`, Unverified until the box).
