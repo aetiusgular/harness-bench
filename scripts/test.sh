@@ -7,5 +7,5 @@ shopt -s globstar nullglob
 # Lint: every module parses.
 for f in src/**/*.mjs tests/**/*.mjs scripts/*.mjs; do node --check "$f"; done
 node tests/red/build-manifest.mjs --check
-files=(tests/contract/*.test.mjs tests/model/**/*.test.mjs tests/truth/**/*.test.mjs tests/score/**/*.test.mjs)
+files=(tests/contract/*.test.mjs tests/integration/*.test.mjs tests/model/**/*.test.mjs tests/truth/**/*.test.mjs tests/score/**/*.test.mjs)
 node --test "${files[@]}"

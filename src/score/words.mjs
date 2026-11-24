@@ -2,6 +2,8 @@
 // egress join (contracts/monitor.md, Paths in a command line; truth.md,
 // Normalization steps 3 and 4). Lane P3c's own helper, not a seam.
 
+import { normalizeAbsolute } from "../common/paths.mjs";
+
 const REDIRECTS = new Set([">", ">>", "<", "2>", "&>"]);
 
 // Split a command line into tokens: { type: "word", value } and
@@ -9,17 +11,43 @@ const REDIRECTS = new Set([">", ">>", "<", "2>", "&>"]);
 // as in sh. No expansion. Unquoted > < | ; & end a word. `2>` is an
 // operator only when the 2 stands alone; `>&` and `<&` duplicate a file
 // descriptor, and their target is not a path.
+//
+// P4 (HB-P3c-r1-C1): `<<`, `<<-` and `<<<` are operators. The word after
+// `<<` or `<<-` is a here-doc delimiter, and the lines after the end of the
+// current line up to the delimiter line are the here-doc body, which is data,
+// not words.
 export function shellTokens(command) {
   const s = String(command ?? "");
   const out = [];
   let word = "";
   let inWord = false;
   let quotedWord = false;
+  let heredocWant = null; // strip flag of a `<<` or `<<-` still waiting for its delimiter
+  const pending = []; // here-docs whose body starts at the next newline
   const endWord = () => {
-    if (inWord) out.push({ type: "word", value: word, quoted: quotedWord });
+    if (inWord) {
+      out.push({ type: "word", value: word, quoted: quotedWord });
+      if (heredocWant !== null) {
+        pending.push({ delim: word, strip: heredocWant });
+        heredocWant = null;
+      }
+    }
     word = "";
     inWord = false;
     quotedWord = false;
+  };
+  // Skip here-doc bodies: i is just past a newline.
+  const skipBodies = () => {
+    while (pending.length) {
+      const { delim, strip } = pending.shift();
+      for (;;) {
+        if (i >= s.length) return;
+        const nl = s.indexOf("\n", i);
+        const line = s.slice(i, nl < 0 ? s.length : nl);
+        i = nl < 0 ? s.length : nl + 1;
+        if ((strip ? line.replace(/^\t+/, "") : line) === delim) break;
+      }
+    }
   };
   let i = 0;
   while (i < s.length) {
@@ -57,6 +85,15 @@ export function shellTokens(command) {
     if (/\s/.test(c)) {
       endWord();
       i++;
+      if (c === "\n") skipBodies();
+      continue;
+    }
+    if (c === "<" && s[i + 1] === "<") {
+      endWord();
+      const op = s[i + 2] === "<" ? "<<<" : s[i + 2] === "-" ? "<<-" : "<<";
+      i += op.length;
+      if (op !== "<<<") heredocWant = op === "<<-";
+      out.push({ type: "op", value: op });
       continue;
     }
     if (c === ">" || c === "<" || c === "&" || c === "|" || c === ";") {
@@ -98,17 +135,63 @@ export function isFileRedirect(op) {
   return REDIRECTS.has(op) || op === "2>>" || op === "&>>" || op === ">|";
 }
 
-// truth.md Normalization steps 3 and 4 on an absolute path: drop . and ..,
-// collapse repeated /, drop a trailing / except for / itself.
-export function normalizeAbsolute(p) {
-  const parts = [];
-  for (const seg of p.split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") parts.pop();
-    else parts.push(seg);
+const SEPARATORS = new Set([";", "&&", "||", "|", "&"]);
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+const MAX_NESTING = 4;
+
+// The words of a command line as a list of { value, redirect }, where
+// `redirect` marks the target of a file redirection. The word after any
+// other redirection operator (a here-doc delimiter, a here-string, a
+// descriptor such as `&1`) is not a word of the command and is dropped.
+// P4 (HB-P3c-r1-E1): a shell started as `sh|bash|zsh|dash|ksh` with an
+// option word that holds `c` (`-c`, `-lc`, `-ec`) runs its next word as a
+// command line, so that word is split again, up to four levels deep.
+export function commandWords(command, depth = 0) {
+  const toks = shellTokens(command);
+  const out = [];
+  let atStart = true;
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.type === "op") {
+      if (SEPARATORS.has(t.value)) {
+        atStart = true;
+        continue;
+      }
+      if (toks[i + 1]?.type === "word") {
+        if (isFileRedirect(t.value)) out.push({ value: toks[i + 1].value, redirect: true });
+        i++;
+      }
+      continue;
+    }
+    if (atStart && depth < MAX_NESTING && SHELLS.has(t.value.slice(t.value.lastIndexOf("/") + 1))) {
+      let j = i + 1;
+      let runsScript = false;
+      while (toks[j]?.type === "word" && /^-[A-Za-z]+$/.test(toks[j].value)) {
+        if (toks[j].value.includes("c")) runsScript = true;
+        j++;
+      }
+      if (runsScript && toks[j]?.type === "word") {
+        out.push({ value: t.value, redirect: false });
+        out.push(...commandWords(toks[j].value, depth + 1));
+        i = j;
+        atStart = false;
+        continue;
+      }
+    }
+    out.push({ value: t.value, redirect: false });
+    atStart = false;
   }
-  return "/" + parts.join("/");
+  return out;
 }
+
+// One shell word per argv element, single-quoted, so an argv array reads as
+// the command line it runs.
+export function argvToCommand(argv) {
+  return argv.map((a) => `'${String(a).replaceAll("'", `'\\''`)}'`).join(" ");
+}
+
+// truth.md Normalization steps 3 and 4 (one copy, src/common/paths.mjs).
+export { normalizeAbsolute };
 
 // monitor.md Normalization: ~ and ~/ become home, a relative path is joined
 // to base, then steps 3 and 4. Returns null when the path cannot be made

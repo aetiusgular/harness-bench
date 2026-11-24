@@ -16,7 +16,7 @@ Every row in `results/*.jsonl` is one JSON object with the BUILD_OUTLINE.md sect
 
 ## Common fields
 
-`table`, `harness`, `cli_version`, `monitor_version`, `split`, `scenario_count`.
+`table`, `harness`, `cli_version`, `monitor_version`, `split`, `scenario_count`, on every table (P4, Request for integration in the P3c PR). On `smoke` and `startup` rows, `monitor_version` is `null` when no monitor ran, `split` is the split of the scenario run (`calibration` for `noop`), and `scenario_count` is the number of scenarios behind the row. The four rows in `results/p2-keyless-smoke.jsonl` predate this and are not edited; they lack `monitor_version`, `split` and `scenario_count`.
 
 ## Tables
 

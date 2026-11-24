@@ -15,6 +15,8 @@ startServer({ scenario, harness, vars, host = "127.0.0.1", port = 0 })
 - Rejects with `unknown variable ${NAME}` if any scenario string uses a variable not in `vars`, and with `unknown harness <name>` for a harness not in `models.lock`.
 - Listens on `host` only. `url` is the base URL the harness is given: `http://127.0.0.1:<port>` for `anthropic-messages` and `gemini`, `http://127.0.0.1:<port>/v1` for `openai-responses` and `openai-chat` (the `wire` in `models.lock`).
 - Speaks the harness's wire format, streaming when the request asks for it. A turn request (one that offers tools) gets the next step of `scenario.steps` as a tool call, mapped as `scenario.md` Neutral actions says. After the last step it gets `final_text` and a stop reason that ends the turn. A side request (offers no tools: a title, a summary, a token count) never advances the script. On the Gemini wire the CLI sends turns as `:streamGenerateContent`; a plain `:generateContent` or `:countTokens` request is a side request (derm's `fakeGemini.mjs` routes them the same way).
+- On the two OpenAI wires, `GET /v1/models` is answered 200 with derm's one-model list (kind `other`); it is not a 404 (P4, Request for integration in the P3a PR).
+- A `listen` that fails rejects, and closes the inner fake first.
 - `requests`: every request seen, `{ at, method, url, kind: "turn" | "side" | "other", body }`. `transcript`: one entry per step, `{ step, action, tool, status: "sent" | "unsupported" }`.
 - Any other method or path gets a 404 JSON error and the server stays up.
 - `close()` resolves when the port is free.
@@ -32,6 +34,7 @@ adapterFor(harness)
 - `argv[0]` is `bin`. `cwd` is `workspace`. `env` is built from nothing: `PATH`, `HOME = home`, the variables that point the harness at `modelUrl`, a dummy credential that starts with `hb-dummy-`, telemetry and update switches, and then `runEnv` on top. No value from the parent process's environment other than `PATH` is passed through.
 - `files`: `{ <absolute path under home or workspace>: <text> }` config files the runner writes before the spawn (for example a provider config). Never outside `home` or `workspace`.
 - The harness runs non-interactively with tool approvals off, so the scripted calls execute.
+- `workspace` is `R/ws` (`run.md`). The `gemini-cli` adapter derives `R/out` as `dirname(workspace)/out` for `--include-directories`; that is why the layout is fixed.
 
 ## Lane P3b: ground-truth collector
 
@@ -111,6 +114,37 @@ makeRow(table, fields) // -> row object; throws "missing field: <name>" for a se
 ruleCell({ ruleId, scenario, vars, truthRecords, findings }) // -> "fired" | "not_fired" | "no_event" | "fired_without_write"
 ```
 
-## P4 and later
+## Shared helper (P4)
 
-The runner (spawn, setup, audit window, results writing) and `scripts/eval.sh` are P4 and P5 work. They use only the functions above.
+`src/common/paths.mjs`
+
+```js
+normalizeAbsolute(p) // truth.md Normalization steps 3 and 4; the one copy both lanes use
+inWorkspace(p, ws)   // run.md Workspace
+```
+
+`src/truth/collect.mjs` `normalizePath` and `src/score/words.mjs` `normalizeAbsolute` are this function.
+
+## Runner (P4)
+
+`src/run/runner.mjs`. It uses only the seams above.
+
+```js
+assertNotRoot(geteuid = process.geteuid)  // throws "runner: refusing to run as uid 0 (contracts/run.md, Run user)"
+makeRunId(harness, scenarioId, repeat)    // run.md Run id
+prepareRun({ harness, scenario, repeat, tmp, geteuid }) // -> { runId, root, vars }: R laid out, setup done; a setup path outside R throws
+runOnce({ harness, scenario, bin, repeat, tmp, timeoutMs, monitor, geteuid, auditLog })
+  // -> { run (R/run.json), root, vars, auditPath (R/audit.log or null), status, signal, timedOut, stderr, transcript, requests, monitorLog }
+sliceAuditLog(text, start, end)           // run.md Audit log
+readAuditLog(file)                        // throws, naming log_group, when the run account cannot read it
+scoreRun({ run, scenario, vars, auditText, monitorText, findingsText, meta })
+  // -> { rows, truth, connects }: headline (both matchers), egress and rule_matrix rows via makeRow
+```
+
+`assertNotRoot` runs first in `prepareRun` and `runOnce`, before anything is created on disk. `monitor` is P5's hook: `{ install({ home, workspace }) -> { exePrefixes, runEnv }, logPath({ home }) }`. The scripted server runs in the runner's process, so `exclude.model_server_pids` is the runner's pid.
+
+`src/run/meta.mjs` reads the section 6 fields at run time: `machineLabel()`, `gitSha()`, `splitHash()`, `section6({ runId })`.
+
+## P5
+
+`scripts/eval.sh`, the monitor install and the box's audit log are P5 work.

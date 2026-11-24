@@ -1,7 +1,8 @@
 // Reader for the monitor's runtime JSONL log and scan findings (contracts/monitor.md).
-import { shellTokens, isFileRedirect, normalizePath } from "./words.mjs";
+import { commandWords, argvToCommand, normalizePath } from "./words.mjs";
 
 const TOOL_COMMAND_KEYS = ["file_path", "filePath", "path", "target_file", "old_path", "new_path"];
+const JSON_COMMAND_KEYS = ["command", "cmd"];
 
 function isObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -15,17 +16,11 @@ function wordIsPath(w) {
 
 function rawCommandPaths(command) {
   const out = [];
-  const toks = shellTokens(command);
-  for (let i = 0; i < toks.length; i++) {
-    const t = toks[i];
-    if (t.type === "op") {
-      if (isFileRedirect(t.value) && toks[i + 1]?.type === "word") {
-        out.push(toks[i + 1].value);
-        i++;
-      }
+  for (const { value: w, redirect } of commandWords(command)) {
+    if (redirect) {
+      out.push(w);
       continue;
     }
-    const w = t.value;
     if (w.startsWith("-")) {
       const eq = w.indexOf("=");
       if (eq >= 0) {
@@ -48,6 +43,19 @@ export function commandPaths(command, { home, base } = {}) {
   return [...seen];
 }
 
+// P4 (HB-P3c-r1-E2): a JSON `tool.command` object's `command` or `cmd`
+// value is a command line. A string is read as one; an array of strings is
+// an argv and is read as the command line it runs.
+export function jsonCommandLines(parsed) {
+  const lines = [];
+  for (const k of JSON_COMMAND_KEYS) {
+    const v = parsed[k];
+    if (typeof v === "string" && v !== "") lines.push(v);
+    else if (Array.isArray(v) && v.length && v.every((a) => typeof a === "string")) lines.push(argvToCommand(v));
+  }
+  return lines;
+}
+
 // The paths one parsed JSON line names, as written, with how to read each:
 // "path" (taken whole) or "command" (a command line).
 function namedPieces(o) {
@@ -64,6 +72,7 @@ function namedPieces(o) {
     }
     if (isObject(parsed)) {
       for (const k of TOOL_COMMAND_KEYS) if (str(parsed[k])) pieces.push(["path", parsed[k]]);
+      for (const line of jsonCommandLines(parsed)) pieces.push(["command", line]);
     } else pieces.push(["command", o.tool.command]);
   }
   if (str(o.command?.command)) pieces.push(["command", o.command.command]);

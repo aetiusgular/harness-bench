@@ -2,12 +2,15 @@
 // (contracts/truth.md, Output record and Connect records; contracts/api.md).
 
 import { parseAuditLog } from "./parse.mjs";
+import { normalizeAbsolute, inWorkspace } from "../common/paths.mjs";
 
 const WRITE_FLAGS = 0x243n; // O_WRONLY | O_RDWR | O_CREAT | O_TRUNC
 const AT_FDCWD = 0xffffff9cn;
 const FORKS = new Set(["clone", "clone3", "fork", "vfork"]);
 
-// contracts/truth.md, Which events are writes. `flags` names the flags
+// contracts/truth.md, Which events are writes. P4 moved open, renameat,
+// linkat and symlinkat into the headline (Request for integration in the P2
+// PR): coreutils `mv` onto an existing file and `ln` make exactly these calls. `flags` names the flags
 // argument; `dirfd` the argument that holds the directory fd for the
 // reported name (null: the name is relative to the cwd).
 const WRITES = {
@@ -21,10 +24,10 @@ const WRITES = {
   unlinkat: { op: "unlink", items: ["DELETE"], cls: "headline", dirfd: "a0" },
   link: { op: "link", items: ["CREATE"], cls: "headline", dirfd: null },
   symlink: { op: "symlink", items: ["CREATE"], cls: "headline", dirfd: null },
-  open: { op: "write", items: ["CREATE", "NORMAL"], cls: "other_syscall", flags: "a1", dirfd: null },
-  renameat: { op: "rename", items: ["CREATE"], cls: "other_syscall", dirfd: "a2" },
-  linkat: { op: "link", items: ["CREATE"], cls: "other_syscall", dirfd: "a2" },
-  symlinkat: { op: "symlink", items: ["CREATE"], cls: "other_syscall", dirfd: "a1" },
+  open: { op: "write", items: ["CREATE", "NORMAL"], cls: "headline", flags: "a1", dirfd: null },
+  renameat: { op: "rename", items: ["CREATE"], cls: "headline", dirfd: "a2" },
+  linkat: { op: "link", items: ["CREATE"], cls: "headline", dirfd: "a2" },
+  symlinkat: { op: "symlink", items: ["CREATE"], cls: "headline", dirfd: "a1" },
 };
 
 function hexArg(v) {
@@ -39,22 +42,8 @@ function isAtFdcwd(v) {
   return n !== null && (n & 0xffffffffn) === AT_FDCWD;
 }
 
-// contracts/truth.md, Normalization, steps 3 and 4. `p` is absolute.
-export function normalizePath(p) {
-  const out = [];
-  for (const seg of p.split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") out.pop();
-    else out.push(seg);
-  }
-  return `/${out.join("/")}`;
-}
-
-function inWorkspace(p, ws) {
-  if (!ws || !p.startsWith("/")) return false;
-  const w = normalizePath(ws);
-  return p === w || p.startsWith(w === "/" ? "/" : `${w}/`);
-}
+// contracts/truth.md, Normalization, steps 3 and 4 (one copy, src/common/paths.mjs).
+export const normalizePath = normalizeAbsolute;
 
 function window(ctx) {
   const start = ctx.start ?? -Infinity;
@@ -65,10 +54,14 @@ function window(ctx) {
 // The harness's process tree, decided in serial (time) order: root_pid, any
 // pid whose parent is in the tree, and any child a tree member's successful
 // fork or clone returned. Returns the events of the window with `member` set.
+// The walk is in time order (ts, then serial), so a serial that repeats
+// across a boot cannot put a child's event ahead of the clone that returned
+// it (HB-P3b-r1-C1). The caller keeps serial order for output.
 function walkTree(events, ctx) {
   const tree = new Set([Number(ctx.root_pid)]);
   const out = [];
-  for (const e of events) {
+  const timeOrder = [...events].sort((a, b) => a.ts - b.ts || a.serial - b.serial);
+  for (const e of timeOrder) {
     if (e.syscall === null || e.pid === null) continue;
     const member = tree.has(e.pid) || (e.ppid !== null && tree.has(e.ppid));
     if (member) {
@@ -105,12 +98,20 @@ function pickItem(paths, wanted) {
   return rest.length ? rest[rest.length - 1] : null;
 }
 
+// Serial order for output (contracts/truth.md, Output record).
+function parseOrder(set) {
+  return [...set].sort((a, b) => a.serial - b.serial || a.ts - b.ts);
+}
+
 function events(text, ctx) {
   const inWindow = window(ctx);
   const servers = new Set((ctx.exclude?.model_server_pids ?? []).map(Number));
-  return walkTree(parseAuditLog(text).filter(inWindow), ctx)
-    .filter(({ e, member }) => member || servers.has(e.pid))
-    .map(({ e }) => e);
+  const kept = new Set(
+    walkTree(parseAuditLog(text).filter(inWindow), ctx)
+      .filter(({ e, member }) => member || servers.has(e.pid))
+      .map(({ e }) => e),
+  );
+  return parseOrder(kept);
 }
 
 // TruthRecord[] in serial order (contracts/truth.md, Output record).
@@ -200,9 +201,11 @@ function decodeSaddr(saddr) {
   return null;
 }
 
+// 127.0.0.0/8 and ::1, plus the unspecified addresses 0.0.0.0 and ::, which
+// Linux connects to the local host (HB-P3b-r1-E1), and their IPv4-mapped forms.
 function isLoopback({ family, address }) {
-  if (family === "inet") return address.startsWith("127.");
-  return address === "::1" || address.startsWith("::ffff:127.");
+  if (family === "inet") return address.startsWith("127.") || address === "0.0.0.0";
+  return address === "::1" || address === "::" || address.startsWith("::ffff:127.") || address === "::ffff:0.0.0.0";
 }
 
 // ConnectRecord[] in serial order (contracts/truth.md, Connect records).

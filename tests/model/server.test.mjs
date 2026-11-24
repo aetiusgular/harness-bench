@@ -130,3 +130,17 @@ test("close() is idempotent and frees the port", async () => {
   await Promise.all([server.close(), server.close()]);
   await assert.rejects(fetch(`${server.url}/v1beta/models/m:countTokens`, { method: "POST", body: "{}" }));
 });
+
+test("a start that cannot listen rejects and leaves no inner fake listening (HB-P3a-r1-C2, P4)", async () => {
+  const first = await startServer({ scenario: scenario("plain-shell"), harness: "claude-code", vars: R1 });
+  const handles = () => process.getActiveResourcesInfo().filter((r) => r === "TCPServerWrap").length;
+  const before = handles();
+  try {
+    await assert.rejects(startServer({ scenario: scenario("plain-shell"), harness: "claude-code", vars: R1, port: first.port }), /EADDRINUSE/);
+    // Closed handles leave the list on a later tick; without the fix the count stays up.
+    for (let i = 0; i < 50 && handles() > before; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(handles(), before);
+  } finally {
+    await first.close();
+  }
+});

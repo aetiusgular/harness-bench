@@ -173,10 +173,17 @@ export async function startServer({ scenario, harness, vars, host = "127.0.0.1",
       await forward(fakePort, req, raw, res);
     });
   });
-  await new Promise((resolve, reject) => {
-    front.once("error", reject);
-    front.listen(port, host, resolve);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      front.once("error", reject);
+      front.listen(port, host, resolve);
+    });
+  } catch (err) {
+    // A failed listen (EADDRINUSE, a bad host) must not leave derm's inner
+    // fake listening (HB-P3a-r1-C2).
+    await fake.close();
+    throw err;
+  }
   const bound = front.address().port;
   const base = `http://${host.includes(":") ? `[${host}]` : host}:${bound}`;
   const url = wire === "openai-responses" || wire === "openai-chat" ? `${base}/v1` : base;

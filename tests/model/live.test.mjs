@@ -61,7 +61,7 @@ async function once(h, id) {
     const r = await run(c.argv, c);
     const expect = substitute(sc.expect, vars).map((e) => e.path);
     const transcript = server.transcript.map((t) => t.status);
-    return { status: r.status, written: expect.map((p) => existsSync(p)), expect, transcript, turns: server.requests.filter((q) => q.kind === "turn").length, err: r.err.slice(-600), root };
+    return { status: r.status, written: expect.map((p) => existsSync(p)), expect, transcript, turns: server.requests.filter((q) => q.kind === "turn").length, modelRequests: server.requests.filter((q) => q.kind !== "other").length, err: r.err.slice(-600), root };
   } finally {
     await server.close();
   }
@@ -74,6 +74,10 @@ for (const h of Object.keys(LOCK.harnesses)) {
       const r = await once(h, id);
       t.diagnostic(JSON.stringify({ harness: h, scenario: id, status: r.status, transcript: r.transcript, turns: r.turns, written: r.written }));
       try {
+        // P4 (HB-P3a-r1-C1): every case, noop included, must show that the CLI
+        // ran to the end and talked to the scripted server.
+        assert.equal(r.status, 0, `${h} ${id}: exit status ${r.status}. stderr: ${r.err}`);
+        assert.ok(r.modelRequests >= 1, `${h} ${id}: no model request reached the server`);
         if (r.transcript.includes("unsupported")) {
           // DECISIONS.md, P2: a harness with no native write tool records the step unsupported.
           assert.deepEqual(r.written, r.expect.map(() => false), `${h} ${id}: unsupported step but the file exists`);
