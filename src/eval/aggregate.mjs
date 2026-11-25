@@ -5,7 +5,7 @@
 // are sums over that repeat's scenarios. The band is over the repeats' rates.
 // A repeat whose denominator is 0 has rate null and is left out of the band
 // (results.md, Band). Runs listed in `dropped` (a timed-out harness, an audit
-// window split by two log rotations) are left out of every sum and named in
+// window split by two log rotations, a root pid no execve record anchored) are left out of every sum and named in
 // the row, never silently.
 import { createHash } from "node:crypto";
 import { band, rate } from "../score/band.mjs";

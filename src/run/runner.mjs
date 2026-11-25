@@ -13,6 +13,7 @@ import { startServer } from "../model/server.mjs";
 import { substitute } from "../model/vars.mjs";
 import { adapterFor } from "../harness/adapters.mjs";
 import { collectWrites, collectConnects } from "../truth/collect.mjs";
+import { parseAuditLog } from "../truth/parse.mjs";
 import { parseMonitorLog, parseFindings } from "../score/monitor.mjs";
 import { matchWrites, matchEgress } from "../score/match.mjs";
 import { ruleCell } from "../score/rulematrix.mjs";
@@ -120,6 +121,32 @@ function spawnHarness(argv, { env, cwd, timeoutMs, pipeGraceMs = 2000 }) {
 
 const auditClock = () => Date.now() / 1000;
 
+// HB-P5-r2-E1. auditd logs pids as the initial pid namespace sees them, but
+// the srt column runs this process under bwrap --unshare-pid, where
+// `child.pid` and `process.pid` are namespace pids (2, 9, ...) that no audit
+// record carries. The harness's own execve is in the slice (the rule pack's
+// execve rule): the first successful execve or execveat in the window whose
+// CWD is the harness's cwd (the run's own workspace) and whose argv holds its
+// argv[0] (a script's argv keeps the path after the interpreter). Its `pid`
+// is the host root pid and its `ppid` the host pid of this process, which
+// spawned the harness directly and runs the scripted server. The match uses
+// the slice's one-second margin, not [start, end]: the kernel stamps records
+// from a coarse clock that can read a few ms behind Date.now(), so the root's
+// execve can carry a stamp just before `start` (seen on this host, 3 of 6
+// runs of a 2 ms harness). The run's own workspace as cwd is what identifies it.
+// `from`: `audit` (found, same pid as child.pid), `audit_translated` (found,
+// another pid: a pid namespace), `unanchored` (no such record; the run is
+// dropped from bands by P5).
+export function hostPids(auditText, { argv0, cwd, start, end, childPid, selfPid = process.pid }) {
+  const hit = parseAuditLog(auditText)
+    .filter((e) => (e.syscall === "execve" || e.syscall === "execveat") && e.success && e.ts >= start - 1 && e.ts <= end + 1)
+    .filter((e) => e.cwd === cwd && Array.isArray(e.execve) && e.execve.includes(argv0) && e.pid !== null)
+    .sort((a, b) => a.ts - b.ts || a.serial - b.serial)[0];
+  if (!hit) return { rootPid: childPid, serverPid: selfPid, from: "unanchored" };
+  if (hit.pid === childPid) return { rootPid: childPid, serverPid: selfPid, from: "audit" };
+  return { rootPid: hit.pid, serverPid: hit.ppid ?? selfPid, from: "audit_translated" };
+}
+
 // One run of one harness on one scenario. Returns the run record (R/run.json)
 // and what the scripted server saw. `monitor`, when given (P5), is
 // { install({ home, workspace }) -> { exePrefixes, runEnv }, logPath({ home }) }.
@@ -137,6 +164,7 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
   let start;
   let end;
   let mon = { exePrefixes: [], runEnv: {} };
+  let launch = null;
   try {
     const cmd = adapterFor(harness).command({ bin, workspace: vars.WS, home: vars.HOME, modelUrl: server.url, prompt: scenario.prompt });
     for (const [f, text] of Object.entries(cmd.files)) {
@@ -148,6 +176,7 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
     // (the monitor edits the Codex config.toml and the Gemini settings.json).
     if (monitor) mon = await monitor.install({ home: vars.HOME, workspace: vars.WS, harness });
     const env = { ...cmd.env, ...(mon.runEnv ?? {}) };
+    launch = { argv0: cmd.argv[0], cwd: cmd.cwd };
     start = auditClock();
     result = await spawnHarness(cmd.argv, { env, cwd: cmd.cwd, timeoutMs });
     end = auditClock();
@@ -178,6 +207,7 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
   writeFileSync(path.join(root, "run.json"), JSON.stringify(run, null, 2) + "\n");
   let auditPath = null;
   let auditRotated = false;
+  let rootPidFrom = "child";
   if (auditLog) {
     // auditd writes asynchronously; give it a moment before reading the window.
     await new Promise((r) => setTimeout(r, auditSettleMs));
@@ -186,11 +216,18 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
     // A window whose head is in neither file (two rotations during one run)
     // would undercount the denominator; the run is marked and P5 drops it.
     auditRotated = (firstStamp(text) ?? Infinity) > start - 1;
-    writeFileSync(auditPath, sliceAuditLog(text, start, end) + "\n", { mode: 0o600 });
+    const slice = sliceAuditLog(text, start, end);
+    writeFileSync(auditPath, slice + "\n", { mode: 0o600 });
+    const host = hostPids(slice, { ...launch, start, end, childPid: result.pid });
+    run.root_pid = host.rootPid;
+    rootPidFrom = host.from;
+    run.exclude.model_server_pids = [host.serverPid];
+    writeFileSync(path.join(root, "run.json"), JSON.stringify(run, null, 2) + "\n");
   }
   return {
     auditPath,
     auditRotated,
+    rootPidFrom,
     run,
     root,
     vars,

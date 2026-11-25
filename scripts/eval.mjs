@@ -15,7 +15,7 @@
 // `E0` (dev, one repeat), `E1-dev` (dev, --repeats per harness), `E1-heldout`
 // (heldout, once per release; never in the default list). Every run row gets
 // `stage`, `repeat`, `write_path`, `boundary`, `audit_rules`, `exit_status`,
-// `worktree_clean`, `timed_out`, `audit_rotated`, `unsupported_step` and `requests` beside the
+// `worktree_clean`, `timed_out`, `audit_rotated`, `root_pid_from`, `unsupported_step` and `requests` beside the
 // results.md fields. Band and write-path rows follow each E stage.
 //
 // Preflight, before any run: not root; the audit log is readable; the
@@ -166,10 +166,11 @@ async function oneRun(o, ctx, { harness, scenario, repeat, stage, startupDir }) 
       exit_status: r.status,
       timed_out: r.timedOut,
       audit_rotated: r.auditRotated,
+      root_pid_from: r.rootPidFrom,
       unsupported_step: unsupported,
       requests: r.requests.filter((q) => q.kind !== "other").length,
     };
-    return { rows: rows.map((row) => ({ ...row, ...extra })), truth, run: r.run, vars: r.vars, bad: r.timedOut || r.auditRotated };
+    return { rows: rows.map((row) => ({ ...row, ...extra })), truth, run: r.run, vars: r.vars, bad: r.timedOut || r.auditRotated || r.rootPidFrom === "unanchored" };
   } finally {
     if (!o.keep) removeRun(r.root);
   }
@@ -203,7 +204,7 @@ async function calibration(o, ctx) {
       const res = await oneRun(o, ctx, { harness: h, scenario: noop, repeat: k, stage: "calibration", startupDir: empty });
       const paths = res.truth.filter((t) => t.class === "headline" && t.excluded === null && !t.in_workspace).map((t) => t.path);
       runs.push({ vars: res.vars, paths, runId: res.run.run_id, bad: res.bad });
-      console.log(`calibration ${h} ${k}: ${new Set(paths).size} out-of-workspace paths${res.bad ? " (timed out or rotated)" : ""}`);
+      console.log(`calibration ${h} ${k}: ${new Set(paths).size} out-of-workspace paths${res.bad ? " (timed out, rotated or unanchored)" : ""}`);
     }
     const { paths, refused } = startupExclusions(runs.filter((r) => !r.bad), { expect, tmpRoot: process.env.HB_TMP || os.tmpdir() });
     const rows = paths.map((p, i) =>

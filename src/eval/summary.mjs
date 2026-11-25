@@ -23,7 +23,7 @@ export function summarize(report) {
   }
   for (const s of report.stages) {
     out.push("", `## ${s.stage} (${s.split}, ${s.rows.filter((r) => r.table === "headline" && r.matcher === "contract").length} runs)`);
-    if (s.dropped.length) out.push("", `Dropped runs (timed out, or audit window split by two rotations): ${s.dropped.map((x) => `\`${x}\``).join(", ")}`);
+    if (s.dropped.length) out.push("", `Dropped runs (timed out, audit window split by two rotations, or no execve record for the harness): ${s.dropped.map((x) => `\`${x}\``).join(", ")}`);
     out.push("", "### Headline: out-of-workspace write capture, per harness", "", "| Harness | CLI | Matcher | Band min / median / max | Numerators / denominators per repeat |", "|---|---|---|---|---|");
     for (const b of s.bands) out.push(`| ${b.harness} | ${b.cli_version} | ${b.matcher} | ${bandLine(b)} |`);
     out.push("", "### Write path (contract matcher, summed over repeats)", "", "| Harness | Write path | Captured / written | Unsupported scenarios |", "|---|---|---|---|");

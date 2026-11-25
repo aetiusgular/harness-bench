@@ -47,7 +47,13 @@ if [[ ! -e node_modules/derm-workspace/package.json ]]; then
     echo "eval: project dependencies are not installed for this package-lock.json; run scripts/p5-setup.sh $prefix on the host first" >&2
     exit 3
   fi
-  [[ -L node_modules ]] && rm node_modules
+  # HB-P5-r2-C1: a real node_modules folder without derm-workspace (a partial
+  # install) would take the link inside it as node_modules/node_modules.
+  if [[ -e node_modules && ! -L node_modules ]]; then
+    echo "eval: node_modules is a folder without derm-workspace; remove it or run npm ci" >&2
+    exit 3
+  fi
+  rm -f node_modules
   ln -s "$deps/node_modules" node_modules
 fi
 export HB_TMP="${HB_TMP:-/tmp}"

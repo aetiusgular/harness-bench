@@ -78,3 +78,21 @@ test("eval.sh: a fresh checkout links node_modules to <prefix>/deps only when th
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("eval.sh: a node_modules folder without derm-workspace is refused, not linked into (HB-P5-r2-C1)", () => {
+  const dir = scratchRepo();
+  try {
+    const prefix = path.join(dir, "prefix");
+    const deps = path.join(prefix, "deps");
+    mkdirSync(path.join(deps, "node_modules", "derm-workspace"), { recursive: true });
+    writeFileSync(path.join(deps, "node_modules", "derm-workspace", "package.json"), "{}\n");
+    copyFileSync(path.join(dir, "package-lock.json"), path.join(deps, "package-lock.json"));
+    mkdirSync(path.join(dir, "node_modules", "other"), { recursive: true });
+    const r = evalSh(dir, { FORGE_COLUMN: "srt", HB_PREFIX: prefix });
+    assert.equal(r.status, 3, r.stderr);
+    assert.match(r.stderr, /node_modules is a folder/);
+    assert.throws(() => lstatSync(path.join(dir, "node_modules", "node_modules")));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
