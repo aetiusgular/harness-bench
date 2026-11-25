@@ -116,7 +116,7 @@ test("the timeout kills the harness's whole process group, so a child holding st
     const sc = scenarios("dev").find((s) => s.id === "plain-shell");
     const t0 = Date.now();
     const r = await runOnce({ harness: "claude-code", scenario: sc, bin: cli, tmp, timeoutMs: 500 });
-    assert.ok(Date.now() - t0 < 10000, `runOnce took ${Date.now() - t0} ms with a 500 ms timeout`);
+    assert.ok(Date.now() - t0 < 6000, `runOnce took ${Date.now() - t0} ms with a 500 ms timeout`);
     assert.equal(r.timedOut, true);
     assert.equal(r.signal, "SIGKILL");
   } finally {
@@ -128,11 +128,11 @@ test("a child that leaves the group and keeps stdout open does not hold the run 
   const tmp = tmpdir();
   try {
     const cli = path.join(tmp, "setsid-cli.sh");
-    writeFileSync(cli, "#!/bin/sh\nsetsid sleep 30 &\nsleep 0.3\nexit 0\n", { mode: 0o755 });
+    writeFileSync(cli, "#!/bin/sh\nsetsid sleep 8 &\nsleep 0.3\nexit 0\n", { mode: 0o755 });
     const sc = scenarios("dev").find((s) => s.id === "plain-shell");
     const t0 = Date.now();
     const r = await runOnce({ harness: "claude-code", scenario: sc, bin: cli, tmp, timeoutMs: 20000 });
-    assert.ok(Date.now() - t0 < 10000, `runOnce took ${Date.now() - t0} ms after the harness exited`);
+    assert.ok(Date.now() - t0 < 6000, `runOnce took ${Date.now() - t0} ms after the harness exited`);
     assert.equal(r.status, 0);
     assert.equal(r.timedOut, false);
   } finally {

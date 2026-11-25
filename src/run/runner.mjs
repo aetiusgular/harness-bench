@@ -132,22 +132,30 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
   if (!Object.hasOwn(LOCK.harnesses, harness)) throw new Error(`unknown harness ${harness}`);
   if (typeof bin !== "string" || !path.isAbsolute(bin)) throw new Error("runner: bin must be an absolute path");
   const { runId, root, vars } = prepareRun({ harness, scenario, repeat, tmp, geteuid });
-  const mon = monitor ? await monitor.install({ home: vars.HOME, workspace: vars.WS }) : { exePrefixes: [], runEnv: {} };
   const server = await startServer({ scenario, harness, vars });
   let result;
   let start;
   let end;
+  let mon = { exePrefixes: [], runEnv: {} };
   try {
-    const cmd = adapterFor(harness).command({ bin, workspace: vars.WS, home: vars.HOME, modelUrl: server.url, prompt: scenario.prompt, runEnv: mon.runEnv ?? {} });
+    const cmd = adapterFor(harness).command({ bin, workspace: vars.WS, home: vars.HOME, modelUrl: server.url, prompt: scenario.prompt });
     for (const [f, text] of Object.entries(cmd.files)) {
       mkdirSync(path.dirname(f), { recursive: true });
       writeFileSync(f, text);
     }
+    // P5: the monitor installs after the adapter's config files are written,
+    // so it merges its settings into them instead of being overwritten by them
+    // (the monitor edits the Codex config.toml and the Gemini settings.json).
+    if (monitor) mon = await monitor.install({ home: vars.HOME, workspace: vars.WS, harness });
+    const env = { ...cmd.env, ...(mon.runEnv ?? {}) };
     start = auditClock();
-    result = await spawnHarness(cmd.argv, { env: cmd.env, cwd: cmd.cwd, timeoutMs });
+    result = await spawnHarness(cmd.argv, { env, cwd: cmd.cwd, timeoutMs });
     end = auditClock();
   } finally {
     await server.close();
+    // The monitor's collector is not in the harness's process tree; it is
+    // stopped after the harness exits so it can flush what it received.
+    if (monitor?.stop) await monitor.stop({ home: vars.HOME });
   }
   const run = {
     run_id: runId,
@@ -169,14 +177,20 @@ export async function runOnce({ harness, scenario, bin, repeat = 1, tmp, timeout
   };
   writeFileSync(path.join(root, "run.json"), JSON.stringify(run, null, 2) + "\n");
   let auditPath = null;
+  let auditRotated = false;
   if (auditLog) {
     // auditd writes asynchronously; give it a moment before reading the window.
     await new Promise((r) => setTimeout(r, auditSettleMs));
     auditPath = path.join(root, "audit.log");
-    writeFileSync(auditPath, sliceAuditLog(readAuditLog(auditLog), start, end) + "\n", { mode: 0o600 });
+    const text = readAuditLog(auditLog, { since: start - 1 });
+    // A window whose head is in neither file (two rotations during one run)
+    // would undercount the denominator; the run is marked and P5 drops it.
+    auditRotated = (firstStamp(text) ?? Infinity) > start - 1;
+    writeFileSync(auditPath, sliceAuditLog(text, start, end) + "\n", { mode: 0o600 });
   }
   return {
     auditPath,
+    auditRotated,
     run,
     root,
     vars,
@@ -210,12 +224,29 @@ export function sliceAuditLog(text, start, end) {
 // Read the host's audit log as the run account. contracts/run.md, Audit log:
 // the run account reads it through auditd's `log_group`; the runner never
 // runs as root and never calls sudo.
-export function readAuditLog(file = process.env.HB_AUDIT_LOG || "/var/log/audit/audit.log") {
+export function readAuditLog(file = process.env.HB_AUDIT_LOG || "/var/log/audit/audit.log", { since = null } = {}) {
+  let text;
   try {
-    return readFileSync(file, "utf8");
+    text = readFileSync(file, "utf8");
   } catch (err) {
     throw new Error(`runner: cannot read the audit log ${file} (${err.code ?? err.message}); set auditd log_group to a group of the run account (contracts/run.md, Audit log)`);
   }
+  // P5: auditd rotates by size (max_log_file_action = ROTATE). When the
+  // current file starts after `since`, the window's head is in `<file>.1`,
+  // which is read first. One rotation per run window is assumed; firstStamp
+  // of the joined text is checked again by the caller (rotatedPastWindow).
+  if (since !== null && (firstStamp(text) ?? Infinity) > since && existsSync(`${file}.1`)) {
+    try {
+      text = readFileSync(`${file}.1`, "utf8") + text;
+    } catch {}
+  }
+  return text;
+}
+
+// The first `msg=audit(<t>:` stamp in an audit log text, or null.
+export function firstStamp(text) {
+  const m = /msg=audit\((\d+(?:\.\d+)?):/.exec(String(text ?? ""));
+  return m ? Number(m[1]) : null;
 }
 
 // Score one finished run into results rows (contracts/results.md): headline

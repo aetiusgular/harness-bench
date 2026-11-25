@@ -134,17 +134,26 @@ assertNotRoot(geteuid = process.geteuid)  // throws "runner: refusing to run as 
 makeRunId(harness, scenarioId, repeat)    // run.md Run id
 prepareRun({ harness, scenario, repeat, tmp, geteuid }) // -> { runId, root, vars }: R laid out, setup done; a setup path outside R throws
 runOnce({ harness, scenario, bin, repeat, tmp, timeoutMs, monitor, geteuid, auditLog })
-  // -> { run (R/run.json), root, vars, auditPath (R/audit.log or null), status, signal, timedOut, stderr, transcript, requests, monitorLog }
+  // -> { run (R/run.json), root, vars, auditPath (R/audit.log or null), auditRotated, status, signal, timedOut, stderr, transcript, requests, monitorLog }
 sliceAuditLog(text, start, end)           // run.md Audit log
-readAuditLog(file)                        // throws, naming log_group, when the run account cannot read it
+readAuditLog(file, { since })             // throws, naming log_group, when the run account cannot read it; reads <file>.1 first when <file> starts after `since` (P5)
+firstStamp(text)                          // the first msg=audit(<t>: stamp, or null
 scoreRun({ run, scenario, vars, auditText, monitorText, findingsText, meta })
   // -> { rows, truth, connects }: headline (both matchers), egress and rule_matrix rows via makeRow
 ```
 
-`assertNotRoot` runs first in `prepareRun` and `runOnce`, before anything is created on disk. `monitor` is P5's hook: `{ install({ home, workspace }) -> { exePrefixes, runEnv }, logPath({ home }) }`. The scripted server runs in the runner's process, so `exclude.model_server_pids` is the runner's pid. The harness runs in its own process group: `timeoutMs` ends the whole group with SIGKILL, and so does the harness's own exit, so no process it started outlives the run inside that group (HB-P4-r1-C1).
+`assertNotRoot` runs first in `prepareRun` and `runOnce`, before anything is created on disk. `monitor` is P5's hook: `{ install({ home, workspace, harness }) -> { exePrefixes, runEnv }, stop({ home }), logPath({ home }) }`. P5 order: the adapter's config files are written first, then `install` (so the monitor merges its settings into them), then the harness runs with `runEnv` over the adapter's env; `stop` runs after the harness exits, before the audit slice is read. `auditRotated` is true when the window's head is in neither the log nor `<file>.1`; P5 drops such runs from bands and names them. The scripted server runs in the runner's process, so `exclude.model_server_pids` is the runner's pid. The harness runs in its own process group: `timeoutMs` ends the whole group with SIGKILL, and so does the harness's own exit, so no process it started outlives the run inside that group (HB-P4-r1-C1).
 
 `src/run/meta.mjs` reads the section 6 fields at run time: `machineLabel()`, `gitSha()`, `splitHash()`, `section6({ runId })`.
 
 ## P5
 
-`scripts/eval.sh`, the monitor install and the box's audit log are P5 work.
+`scripts/eval.sh` calls `scripts/eval.mjs` (stages, preflight, rows; its header). The monitor hook is `src/monitor/beacon.mjs`:
+
+```js
+beaconMonitor({ binDir, rulesDir, settleMs = 3000, stopWaitMs = 10000 })
+  // -> { version(), install(), stop(), logPath(), scan({ home }) -> findings JSON text }
+MONITOR_HARNESS                            // harness id -> the monitor's --harness name
+```
+
+`src/eval/startup.mjs` `startupExclusions(runs, { expect, tmpRoot })` turns calibration runs into startup entries (run.md, Startup exclusions). `src/eval/aggregate.mjs` `aggregate(rows, { meta, scenarioCount, dropped })` gives `headline_band` and `write_path` rows. `src/eval/summary.mjs` `summarize(report)` writes `results/summary.md`.

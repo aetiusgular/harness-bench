@@ -168,11 +168,13 @@ export function commandWords(command, depth = 0) {
       let runsScript = false;
       // Short option words (`-c`, `-lc`, `+x`), long ones (`--noprofile`),
       // and the argument of `-o`/`+o`/`-O`/`+O`, `--rcfile` and `--init-file`
-      // (HB-P4-r1-E1).
-      while (toks[j]?.type === "word" && /^(?:[-+][A-Za-z]+|--[a-z][a-z-]*)$/.test(toks[j].value)) {
+      // (HB-P4-r1-E1). A short option word that ends in `o`/`O` takes the
+      // next word too (`-euo pipefail`), and `--opt=value` is one word
+      // (HB-P4-r2-E1, P5).
+      while (toks[j]?.type === "word" && /^(?:[-+][A-Za-z]+|--[a-z][a-z-]*(?:=.*)?)$/s.test(toks[j].value)) {
         const opt = toks[j].value;
         if (/^-[A-Za-z]*c/.test(opt)) runsScript = true;
-        j += /^[-+][oO]$|^--(?:rcfile|init-file)$/.test(opt) ? 2 : 1;
+        j += /^[-+][A-Za-z]*[oO]$|^--(?:rcfile|init-file)$/.test(opt) ? 2 : 1;
       }
       if (runsScript && toks[j]?.type === "word") {
         out.push({ value: t.value, redirect: false });
