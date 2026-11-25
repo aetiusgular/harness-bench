@@ -1,6 +1,6 @@
 # P5 failure case: the kernel path and the monitor path do not meet
 
-Pilot, not the measured run. Rows: `results/p5-pilot.jsonl`, `stage: "E0"`, `audit_rules: "host:derm_exec,derm_fork,derm_net,derm_write"` (this machine has derm's audit rules loaded, not `contracts/audit.rules.template`). Summary: `results/p5-pilot-summary.md`. Machine, commit and date are in each row.
+Pilot, not the measured run. Rows: `results/p5-pilot.jsonl`, `stage: "E0"`, `audit_rules: "host:derm_exec,derm_fork,derm_net,derm_sens,derm_write"` (this machine has derm's audit rules loaded, not `contracts/audit.rules.template`). Summary: `results/p5-pilot-summary.md`. Machine, commit and date are in each row. The rows' `git_sha` is `6c59301` (the P4 merge), but they were produced by the uncommitted P5 tree on top of it; P5 r2 adds a `worktree_clean` field so later rows say so themselves (HB-P5-r1-E1, `reviews/P5-r1.md`).
 
 ## What happened
 

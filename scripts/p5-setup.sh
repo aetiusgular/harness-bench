@@ -9,11 +9,17 @@
 #   <prefix>/cli/node_modules/.bin/{claude,codex,gemini,opencode}   models.lock versions, npm, --ignore-scripts
 #   <prefix>/beacon/bin/{beacon,beacon-hooks,beacon-otelcol,beacon-vector}
 #   <prefix>/beacon/threat-rules.tar.gz, <prefix>/beacon/rules/rules/
+#   <prefix>/deps/{package.json,package-lock.json,node_modules}   this repo's own
+#       dependencies (derm-workspace), npm ci --ignore-scripts; scripts/eval.sh
+#       links node_modules to it when the lockfiles match (HB-P5-r1-C1)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 prefix="${1:-$HOME/.cache/harness-bench/p5}"
 lock=models.lock
-mkdir -p "$prefix/cli" "$prefix/beacon"
+mkdir -p "$prefix/cli" "$prefix/beacon" "$prefix/deps"
+
+cp package.json package-lock.json "$prefix/deps/"
+(cd "$prefix/deps" && npm ci --no-fund --no-audit --ignore-scripts >/dev/null)
 
 pkgs=()
 while read -r npm ver; do pkgs+=("$npm@$ver"); done < <(jq -r '.harnesses[] | "\(.npm) \(.version)"' "$lock")

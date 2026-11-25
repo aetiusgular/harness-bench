@@ -19,7 +19,7 @@ export function summarize(report) {
   if (report.pilot) out.push("", "The audit rules on this machine are not `contracts/audit.rules.template`, so these rows are a pilot of the pipeline. No number here is the headline.");
   if (report.calibration) {
     out.push("", "## Calibration (startup exclusions)", "", "| Harness | Excluded paths | Refused |", "|---|---|---|");
-    for (const c of report.calibration) out.push(`| ${c.harness} | ${c.paths.map((p) => `\`${p}\``).join("<br>") || "none"} | ${c.refused.map((r) => `\`${r.path}\` (${r.reason})`).join("<br>") || "none"} |`);
+    for (const c of report.calibration) out.push(`| ${c.harness}${c.reused ? ` (reused \`${c.reused}\`, not recalibrated)` : ""} | ${c.paths.map((p) => `\`${p}\``).join("<br>") || "none"} | ${c.refused.map((r) => `\`${r.path}\` (${r.reason})`).join("<br>") || "none"} |`);
   }
   for (const s of report.stages) {
     out.push("", `## ${s.stage} (${s.split}, ${s.rows.filter((r) => r.table === "headline" && r.matcher === "contract").length} runs)`);
