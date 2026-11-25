@@ -7,16 +7,41 @@
     "runtime": "node, src/model/ (harness-bench)"
   },
   "harnesses": {
-    "claude-code": {"npm": "@anthropic-ai/claude-code", "version": "2.1.331", "bin": "claude", "wire": "anthropic-messages"},
-    "codex":       {"npm": "@openai/codex", "version": "0.172.0", "bin": "codex", "wire": "openai-responses"},
-    "gemini-cli":  {"npm": "@google/gemini-cli", "version": "0.71.1", "bin": "gemini", "wire": "gemini"},
-    "opencode":    {"npm": "opencode-ai", "version": "1.19.6", "bin": "opencode", "wire": "openai-chat"}
+    "claude-code": {
+      "npm": "@anthropic-ai/claude-code",
+      "version": "2.1.331",
+      "bin": "claude",
+      "wire": "anthropic-messages"
+    },
+    "codex": {
+      "npm": "@openai/codex",
+      "version": "0.172.0",
+      "bin": "codex",
+      "wire": "openai-responses"
+    },
+    "gemini-cli": {
+      "npm": "@google/gemini-cli",
+      "version": "0.71.1",
+      "bin": "gemini",
+      "wire": "gemini"
+    },
+    "opencode": {
+      "npm": "opencode-ai",
+      "version": "1.19.6",
+      "bin": "opencode",
+      "wire": "openai-chat"
+    }
   },
   "monitor": {
     "source": "https://github.com/Asymptote-Labs/agent-beacon",
     "release": "v1.3.67",
     "commit": "ab6ca05cd65d7b076caa1d28963cab42a5057001",
-    "install": "user mode (no root), per research/P1.md section 4 candidate A"
+    "install": "user mode (no root), per research/P1.md section 4 candidate A",
+    "archive": "beacon_1.3.67_linux_amd64.tar.gz",
+    "archive_sha256": "2453ae36ad4b234b15d20856c0515d86f748c482bb6e5e02237261a3f92131a1",
+    "rules": "threat-rules.tar.gz (release asset; not listed in the release checksums.txt, so its sha256 is pinned here, read 2026-11-25)",
+    "rules_sha256": "3a567b07a8a8bd86bbed3858d504fb9ef0581504bf3c6fb3de2307a2f8918a79",
+    "p5_note": "P5: release archive checked against the release checksums.txt by scripts/p5-setup.sh; the rule pack against rules_sha256. scan runs with --rules <pack> (src/monitor/beacon.mjs)."
   },
   "derm": {
     "source": "https://github.com/aetiusgular/derm",

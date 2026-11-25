@@ -65,6 +65,8 @@ test("a nested shell after long options or an -o argument is split again (HB-P4-
   assert.deepEqual(P(`bash -o pipefail -c "echo x > /tmp/a"`), ["/tmp/a"]);
   assert.deepEqual(P(`bash --rcfile /etc/rc -lc "echo x > /tmp/a"`), ["/tmp/a"]); // --rcfile's argument is an option value, not a word of the command
   assert.deepEqual(P(`bash --norc /w/s.sh`), ["/w/s.sh"]); // --norc does not run a command string
+  assert.deepEqual(P(`bash -euo pipefail -c "echo x > /tmp/a"`), ["/tmp/a"]); // HB-P4-r2-E1
+  assert.deepEqual(P(`bash --rcfile=/etc/rc -c "echo x > /tmp/a"`), ["/tmp/a"]); // HB-P4-r2-E1
 });
 
 test("a JSON tool.command's command or cmd value is a command line (HB-P3c-r1-E2)", () => {
